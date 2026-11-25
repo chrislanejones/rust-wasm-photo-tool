@@ -1,5 +1,6 @@
 // A swatch palette the user can edit: it starts as the site's own colors and
-// the user can replace any swatch, remove one, or add their own. Kept per
+// the user can remove a swatch or add their own — in the color dialog, which
+// edits a draft and saves the whole list on OK (`set`). Kept per
 // palette (`key`) in localStorage — the no-login cache, the same backing the
 // signed-out global palette uses (useUserColors). Every grid showing the same
 // key stays in step in this tab (the listener set below, no window event)
@@ -62,16 +63,9 @@ const norm = (c: string) => c.trim().toLowerCase();
 
 export interface EditablePalette {
   colors: readonly string[];
-  /** True once the user has changed it from the site's colors. */
-  edited: boolean;
-  /** Swap the swatch at `index` for `color`. A color already elsewhere in
-   *  the palette moves here instead of appearing twice. */
-  replace: (index: number, color: string) => void;
-  /** Append `color` (no-op if it is already there or the palette is full). */
-  add: (color: string) => void;
-  remove: (index: number) => void;
-  /** Back to the site's colors. */
-  reset: () => void;
+  /** Save the whole list (the dialog's draft): duplicates dropped, capped at
+   *  MAX_PALETTE_COLORS, never empty. */
+  set: (colors: readonly string[]) => void;
 }
 
 export function useEditablePalette(key: string, defaults: readonly string[]): EditablePalette {
@@ -94,44 +88,18 @@ export function useEditablePalette(key: string, defaults: readonly string[]): Ed
     [key, defaults],
   );
 
-  const current = useCallback(() => parse(readRaw(key)) ?? [...defaults], [key, defaults]);
-
-  const replace = useCallback(
-    (index: number, color: string) => {
-      const c = color.trim();
-      const list = current();
-      if (!c || index < 0 || index >= list.length) return;
+  const set = useCallback(
+    (list: readonly string[]) => {
       const next: string[] = [];
-      list.forEach((existing, i) => {
-        if (i === index) next.push(c);
-        else if (norm(existing) !== norm(c)) next.push(existing);
-      });
-      commit(next);
+      for (const raw of list) {
+        const c = raw.trim();
+        if (c && !next.some((e) => norm(e) === norm(c))) next.push(c);
+      }
+      if (next.length === 0) return;
+      commit(next.slice(0, MAX_PALETTE_COLORS));
     },
-    [current, commit],
+    [commit],
   );
 
-  const add = useCallback(
-    (color: string) => {
-      const c = color.trim();
-      const list = current();
-      if (!c || list.length >= MAX_PALETTE_COLORS) return;
-      if (list.some((existing) => norm(existing) === norm(c))) return;
-      commit([...list, c]);
-    },
-    [current, commit],
-  );
-
-  const remove = useCallback(
-    (index: number) => {
-      const list = current();
-      if (index < 0 || index >= list.length) return;
-      commit(list.filter((_, i) => i !== index));
-    },
-    [current, commit],
-  );
-
-  const reset = useCallback(() => write(key, null), [key]);
-
-  return { colors, edited: stored !== null, replace, add, remove, reset };
+  return { colors, set };
 }

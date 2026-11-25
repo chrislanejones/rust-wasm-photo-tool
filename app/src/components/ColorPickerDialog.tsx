@@ -8,20 +8,27 @@
 //   │   hue + brightness       │ H  S  L                │
 //   │   alpha                  │ Palette  ● ● ● ● (+)   │
 //   └──────────────────────────┴────────────────────────┘
-//                                          [Cancel] [Use color]
+//                                          [Cancel] [OK]
 //
 // State model: HSV + alpha are the source of truth and RGB / HSL / hex are
 // DERIVED on every render. Storing RGB instead would lose the hue the moment
 // the user drags to black or white (rgb(0,0,0) has no hue), which snaps the
 // wheel marker to red on the way back up — the classic picker bug.
 //
-// "Use color" hands the picked color to the control that opened the dialog
+// OK hands the picked color to the control that opened the dialog
 // (a stroke, fill, guide color…). The palette row's own "+" is separate and
 // SAVES the color to the global user palette (hooks/useUserColors.ts) —
 // localStorage when signed out, the Convex `user_colors` table when signed in
 // — so it shows up on every swatch grid in the app.
+//
+// A grid with an EDITABLE palette (Fill Color, useEditablePalette) passes it
+// as `palette`, and the dialog is where it is edited (Chris, 11-25-2026: the
+// ×s go "on the swatch selector", not on the panel). Its section lists the
+// palette — the site's 12 colors until the user changes them — each with a
+// visible ×, a "+" that adds the current color, and Reset to the site colors.
+// Those edits are a DRAFT: OK saves it (and uses the color), Cancel drops it.
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Plus, Check, Circle as CircleIcon, Square as SquareIcon } from "lucide-react";
+import { Plus, Check, RotateCcw, Circle as CircleIcon, Square as SquareIcon } from "lucide-react";
 import {
   Dialog,
   DialogClose,
@@ -83,10 +90,29 @@ export interface ColorPickerDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Color the dialog opens on — normally the control's current value. */
   initialColor: string;
-  /** Receives the normalized `#rrggbb` / `#rrggbbaa` on "Use color". */
+  /** Receives the normalized `#rrggbb` / `#rrggbbaa` on OK. */
   onPick: (hex: string) => void;
   title?: string;
+  /** The opening grid's own editable palette (useEditablePalette). Shown and
+   *  edited here instead of on the panel. */
+  palette?: DialogPalette;
 }
+
+/** An editable swatch palette, as the dialog edits it. */
+export interface DialogPalette {
+  /** The row's name: "Fill Color" → "Fill Color palette". */
+  label: string;
+  /** What the row shows now — the draft starts here on every open. */
+  colors: readonly string[];
+  /** The site's colors, what Reset puts back. */
+  defaults: readonly string[];
+  max: number;
+  /** Called on OK with the draft, only when it changed. */
+  save: (colors: readonly string[]) => void;
+}
+
+const sameColors = (a: readonly string[], b: readonly string[]) =>
+  a.length === b.length && a.every((c, i) => c.trim().toLowerCase() === b[i].trim().toLowerCase());
 
 export function ColorPickerDialog({
   open,
@@ -94,6 +120,7 @@ export function ColorPickerDialog({
   initialColor,
   onPick,
   title = "Pick a color",
+  palette,
 }: ColorPickerDialogProps) {
   const { userColors, addColor, removeColor } = useUserColors();
   const [mode, setModeState] = useState<PickerMode>(loadMode);
@@ -110,6 +137,14 @@ export function ColorPickerDialog({
   const [alpha, setAlpha] = useState(FALLBACK.a);
   // What the control held when we opened — the "current" half of the preview.
   const [startHex, setStartHex] = useState<string | null>(null);
+  // The palette being edited, saved on OK. Fresh from the row on every open.
+  const [draft, setDraft] = useState<readonly string[]>(palette?.colors ?? []);
+  const paletteColors = palette?.colors;
+  useEffect(() => {
+    if (open && paletteColors) setDraft(paletteColors);
+    // Only on open: a draft in progress must not be reset by a re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Seed from the opening color each time the dialog opens. The hex branch
   // is sync; anything else (rgb(), rgba()) goes through the Rust parser.
@@ -150,25 +185,14 @@ export function ColorPickerDialog({
   const hsl = useMemo(() => hsvToHsl(hsv), [hsv]);
   const hex = rgbaToHex(rgb, alpha);
   const css = formatRgba(rgb, alpha);
-  const alreadySaved = userColors.some((c) => c.trim().toLowerCase() === hex);
 
-  // The saved swatches pick exactly one color, so they are a named radio
-  // group, the same contract as ColorSwatchGrid (UI_CONSISTENCY §7). They were
-  // the one swatch row in the app whose lit ring nothing announced.
+  // A palette swatch loads its color into the picker.
   const pickSaved = (c: string) => {
     const parsed = hexToRgba(c);
     if (!parsed) return;
     setHsv(rgbToHsv(parsed.rgb));
     setAlpha(parsed.a);
   };
-  const savedIds = userColors.map((c, i) => `${i}:${c}`);
-  const savedChecked = userColors.findIndex((c) => c.toLowerCase() === hex);
-  const savedRadio = useRadioGroup({
-    ids: savedIds,
-    selected: savedChecked >= 0 ? savedIds[savedChecked] : undefined,
-    isDisabled: () => false,
-    onSelect: (id) => pickSaved(userColors[savedIds.indexOf(id)]),
-  });
 
   const setRgbChannel = (key: "r" | "g" | "b", raw: number) => {
     if (Number.isNaN(raw)) return;
@@ -181,6 +205,7 @@ export function ColorPickerDialog({
   };
 
   const confirm = () => {
+    if (palette && !sameColors(draft, palette.colors)) palette.save(draft);
     onPick(hex);
     onOpenChange(false);
   };
@@ -204,8 +229,17 @@ export function ColorPickerDialog({
         <DialogHeader>
           <DialogTitle className="text-base">{title}</DialogTitle>
           <DialogDescription className="text-2xs">
-            Drag on the {mode === "wheel" ? "wheel" : "square"}, or type a value. Save it to your
-            palette to reuse it on every color picker.
+            {palette ? (
+              <>
+                Pick a color, then + adds it to the palette and × takes one off. OK saves the
+                palette.
+              </>
+            ) : (
+              <>
+                Drag on the {mode === "wheel" ? "wheel" : "square"}, or type a value. Save it to
+                your palette to reuse it on every color picker.
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -285,51 +319,52 @@ export function ColorPickerDialog({
               <ChannelField label="L" value={Math.round(hsl.l)} max={100} onChange={(n) => setHslChannel("l", n)} />
             </FieldGroup>
 
-            {/* ── Global palette ─────────────────────────────────────── */}
-            <div className="space-y-2 border-t border-border pt-3">
-              <FieldLabel
-                title={`Palette (${userColors.length}/32)`}
-                info="Colors you save here show up on every color picker in the app — stroke, fill, guides, text. They stay in this browser until you sign in, then follow your account."
+            {/* ── The grid's own palette (Fill Color), edited here ──────── */}
+            {palette && (
+              <PaletteSection
+                title={`${palette.label} palette (${draft.length}/${palette.max})`}
+                info={`The colors on the ${palette.label} row. × takes one off, + adds the color above, Reset puts the site's colors back. OK saves the palette; Cancel leaves it as it was. It stays in this browser.`}
+                name={`${palette.label} palette`}
+                colors={draft}
+                hex={hex}
+                max={palette.max}
+                onPick={pickSaved}
+                // The last color stays: an empty row has nothing to pick.
+                onRemove={
+                  draft.length > 1 ? (i) => setDraft((d) => d.filter((_, j) => j !== i)) : undefined
+                }
+                onAdd={() => setDraft((d) => [...d, hex])}
+                onReset={
+                  sameColors(draft, palette.defaults) ? undefined : () => setDraft(palette.defaults)
+                }
+                removeAlwaysVisible
+                note={sameColors(draft, palette.colors) ? undefined : "OK saves these changes."}
               />
-              <div className="flex flex-wrap gap-2">
-                {/* `contents`, as in ColorSwatchGrid: the swatches and the "+"
-                    keep wrapping as one row of circles. */}
-                <div {...savedRadio.groupProps} aria-label="Palette" className="contents">
-                  {userColors.map((c, i) => (
-                    <Swatch
-                      key={c}
-                      color={c}
-                      label={`Use ${c}`}
-                      removeLabel={`Remove ${c} from palette`}
-                      title={c}
-                      active={c.toLowerCase() === hex}
-                      onClick={() => pickSaved(c)}
-                      onRemove={() => removeColor(c)}
-                      radio={savedRadio.itemProps(i)}
-                    />
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => addColor(hex)}
-                  disabled={alreadySaved}
-                  aria-label={alreadySaved ? "Already in your palette" : "Save to palette"}
-                  title={alreadySaved ? "Already in your palette" : "Save to palette"}
-                  className={cn(
-                    "flex h-7 w-7 items-center justify-center rounded-full border-2 transition-all",
-                    alreadySaved
-                      ? "border-theme-primary bg-theme-primary/15 text-theme-primary"
-                      : "border-dashed border-theme-border bg-theme-muted/20 text-theme-muted-foreground hover:border-theme-foreground/50 hover:text-theme-foreground",
-                  )}
-                >
-                  {alreadySaved ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-                </button>
-              </div>
-              <p className="text-2xs leading-relaxed text-text-muted">
-                Saved colors appear on every picker.{" "}
-                {userColors.length === 0 && "Press + to save the current color."}
-              </p>
-            </div>
+            )}
+
+            {/* ── Global palette ─────────────────────────────────────── */}
+            {/* Under an editable palette only when it holds something: those
+                colors still show on the row, and here is where they come off. */}
+            {(!palette || userColors.length > 0) && (
+              <PaletteSection
+                title={palette ? `Saved colors (${userColors.length}/32)` : `Palette (${userColors.length}/32)`}
+                info="Colors you save here show up on every color picker in the app — stroke, fill, guides, text. They stay in this browser until you sign in, then follow your account."
+                name={palette ? "Saved colors" : "Palette"}
+                colors={userColors}
+                hex={hex}
+                max={32}
+                onPick={pickSaved}
+                onRemove={(i) => removeColor(userColors[i])}
+                onAdd={() => addColor(hex)}
+                removeAlwaysVisible={palette !== undefined}
+                note={
+                  <>
+                    Saved colors appear on every picker.{" "}
+                    {userColors.length === 0 && "Press + to save the current color."}
+                  </>
+                }
+              />
+            )}
           </div>
         </DialogBody>
 
@@ -346,7 +381,7 @@ export function ColorPickerDialog({
             >
               <span className="block h-full w-full" style={{ backgroundColor: css }} />
             </span>
-            Use color
+            OK
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -386,6 +421,105 @@ function useDragSurface(onPoint: (fx: number, fy: number) => void) {
     ref.current?.releasePointerCapture(e.pointerId);
   };
   return { ref, onPointerDown, onPointerMove, onPointerUp };
+}
+
+/** One palette in the dialog: its swatches (a named radio group, the same
+ *  contract as ColorSwatchGrid, UI_CONSISTENCY §7), a × on each, and a "+"
+ *  that saves the current color. */
+function PaletteSection({
+  title,
+  info,
+  name,
+  colors,
+  hex,
+  max,
+  onPick,
+  onRemove,
+  onAdd,
+  onReset,
+  removeAlwaysVisible = false,
+  note,
+}: {
+  title: string;
+  info: string;
+  /** The radio group's accessible name. */
+  name: string;
+  colors: readonly string[];
+  /** The picker's current color, lowercase `#rrggbb[aa]`. */
+  hex: string;
+  max: number;
+  onPick: (color: string) => void;
+  onRemove?: (index: number) => void;
+  onAdd: () => void;
+  onReset?: () => void;
+  removeAlwaysVisible?: boolean;
+  note?: React.ReactNode;
+}) {
+  const ids = colors.map((c, i) => `${i}:${c}`);
+  const checked = colors.findIndex((c) => c.trim().toLowerCase() === hex);
+  const radio = useRadioGroup({
+    ids,
+    selected: checked >= 0 ? ids[checked] : undefined,
+    isDisabled: () => false,
+    onSelect: (id) => onPick(colors[ids.indexOf(id)]),
+  });
+  const alreadySaved = checked >= 0;
+  const full = colors.length >= max;
+  const addLabel = alreadySaved
+    ? `Already in ${name}`
+    : full
+      ? `${name} holds ${max} colors`
+      : `Save to ${name}`;
+
+  return (
+    <div className="space-y-2 border-t border-border pt-3">
+      <div className="flex items-center justify-between gap-2">
+        <FieldLabel title={title} info={info} />
+        {onReset && (
+          <Button variant="link" onClick={onReset} aria-label={`Reset ${name} to the site colors`}>
+            <RotateCcw className="h-3 w-3" />
+            Reset
+          </Button>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {/* `contents`, as in ColorSwatchGrid: the swatches and the "+"
+            keep wrapping as one row of circles. */}
+        <div {...radio.groupProps} aria-label={name} className="contents">
+          {colors.map((c, i) => (
+            <Swatch
+              key={c}
+              color={c}
+              label={`Use ${c}`}
+              removeLabel={`Remove ${c} from ${name}`}
+              removeAlwaysVisible={removeAlwaysVisible}
+              title={c}
+              active={i === checked}
+              onClick={() => onPick(c)}
+              onRemove={onRemove ? () => onRemove(i) : undefined}
+              radio={radio.itemProps(i)}
+            />
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={onAdd}
+          disabled={alreadySaved || full}
+          aria-label={addLabel}
+          title={addLabel}
+          className={cn(
+            "flex h-7 w-7 items-center justify-center rounded-full border-2 transition-all disabled:cursor-default",
+            alreadySaved
+              ? "border-theme-primary bg-theme-primary/15 text-theme-primary"
+              : "border-dashed border-theme-border bg-theme-muted/20 text-theme-muted-foreground hover:border-theme-foreground/50 hover:text-theme-foreground disabled:opacity-40",
+          )}
+        >
+          {alreadySaved ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+      {note && <p className="text-2xs leading-relaxed text-text-muted">{note}</p>}
+    </div>
+  );
 }
 
 const WHEEL_PX = 220;

@@ -60,3 +60,19 @@ global palette, but could not replace or remove a site color.
   localStorage is what the signed-out global palette (`useUserColors`)
   already uses. No schema bump for a list of strings.
 - **A window event for same-tab sync:** banned for new code (Stage 3).
+
+## Amendment 11-25-2026 — the palette is edited in the dialog
+
+Chris: no pencil or × on the panel; they belong "on the swatch selector".
+The row is plain circles now, and the pencil (replace) is gone. Its job is a
+× and a "+". The "+" dialog takes the row's palette as a `palette` prop and
+lists it under **Fill Color palette (N/32)**: the twelve site colors until
+changed, each with a × that is always shown (the last color has none), a "+"
+that adds the color being picked, and Reset once it differs. Those edits are
+a DRAFT: OK saves the whole list (`useEditablePalette.set`) and uses the
+color, Cancel drops them; the hook's `replace`, `add`, `remove` and `reset`
+are gone. Saved colors (`useUserColors`) are listed below it when there are
+any, with their own × (those still save at once, as before). The confirm
+button reads OK instead of "Use color", and a transparent value opens the
+dialog on the row's last solid color rather than black at 0%. Point 3 above is otherwise unchanged:
+same storage, same key, same sync.
