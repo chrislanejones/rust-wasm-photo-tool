@@ -24,6 +24,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.81",
+    date: "2026-11-25",
+    headline: "Edit your swatches in one place.",
+    entries: [
+      { tag: "feature", text: "The Fill Color + opens Edit swatches: your colors with an × on each, + to add, Reset, then OK." },
+      { tag: "ui", text: "The Fill Color row is plain circles, with no pencils or ×s on hover." },
+      { tag: "ui", text: "The color dialog's button says OK instead of Use color." },
+      { tag: "fix", text: "Opening the color dialog on a see-through fill starts on your last solid color, not black." },
+    ],
+  },
+  {
     version: "v9.80",
     date: "2026-11-25",
     headline: "Steady the Pen, and the editor opens faster.",

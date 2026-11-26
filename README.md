@@ -99,33 +99,20 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.80 — 2026-11-25
+### v9.81 — 2026-11-25
 
-**Steady the Pen, and the editor opens faster.**
+**Edit your swatches in one place.**
 
-The Pen panel has a **Stroke Stabilizer** row now, last in the panel like in
-Paint and Blur. The Pen was already steadied by that setting, but the only
-way to change it was from another tool. Every stabilizer row also swapped its
-four words for four tiles: one pen, with a trail behind it that goes from
-jagged (Off) to a clean sweep (High), so you can see the level at a glance.
+The **+** at the end of the Fill Color row now opens **Edit swatches**. Your
+colors are listed there, the twelve site colors until you change them, each
+with an **×** to take it off. Pick a color on the wheel and press **+** to add
+it, or **Reset** to get the site colors back. Press **OK** to save, or
+**Cancel** to leave everything as it was.
 
-The emoji list used to ride along with every page load, whether you ever
-opened Create › Emoji or not. Now it loads the first time the picker opens.
-That takes the editor's main script from 868 KB to 759 KB (gzipped).
-
-The editor's files are also cached for a year now. Every one of them has a
-hash in its name, so a new release gets new names and your browser never
-holds on to an old copy. Before this, it asked the server again on every visit.
-
-Smaller things:
-
-- Pasting into a text box on the New screen, like the Paste SVG box, goes
-  into that box. If the clipboard also held an image, it no longer opens as
-  a photo.
-- The in-app keyboard shortcuts sheet lists the Layers keys and Copy Look /
-  Paste Look.
-- The marketing site's command palette has About, and its code is linted
-  with the editor's.
+The row itself is just circles now, with no little pencils and ×s popping up
+when you hover. The color dialog's button says **OK** instead of "Use color",
+and opening it on a see-through fill starts on your last solid color instead
+of black.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

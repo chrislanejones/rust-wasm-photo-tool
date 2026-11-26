@@ -12458,3 +12458,20 @@ Verification: run after the trail data regen. TypeScript clean; lint 0 errors (5
 No engine change (980,450 B). No Dexie schema or op-log change.
 
 Verification: run after the trail data regen. TypeScript clean; lint 0 errors (56 warnings); guardrails pass; vitest 2,564/2,564; marketing build passes. e2e on a production build: `ui-night3-panels` (incl. the stabilizer row) and `emoji-picker-lazy`, 5 passed.
+
+## v9.81 Change Summary — 2026-11-25
+
+**Edit your swatches in one place.**
+
+| Area | Change |
+| --- | --- |
+| Fill Color (#520) | The row's **+** opens **Edit Fill Color swatches** (tooltip "Edit swatches"). Its **Fill Color swatches (N/32)** section lists the row's colors (the 12 site colors until changed), each with an always-visible **×** (none on the last), a **+** that adds the picked color, and **Reset** to the site colors. Edits are a draft: **OK** saves them and uses the color, **Cancel** drops both. |
+| Fill Color (#520) | The row is plain circles: no pencil, no ×, no Reset arrow. Replacing a color is now remove + add. |
+| Color dialog (#520) | The confirm button reads **OK** everywhere (was "Use color"). Saved colors show under the swatches when there are any, with their own ×. |
+| Fix (#520) | Opened on a transparent fill, the dialog started on black at 0%. It now starts on the row's last solid color. |
+| Code (#520) | `ColorPickerDialog` takes a `palette` prop; `useEditablePalette` is one `set(colors)` (was replace/add/remove/reset); `Swatch` loses the pencil badge and gains `removeAlwaysVisible`. ADR-110 amendment (draft). |
+| Trail Log | Squares catch up through 11-25. |
+
+No engine change (980,450 B). No Dexie or op-log change.
+
+Verification: run after the trail data regen. TypeScript clean; lint 0 errors (56 warnings); guardrails pass; vitest 2,572/2,572; marketing build passes. Production preview (Playwright): the row has the edit button; the dialog shows 12 swatches with 12 ×; × then OK leaves 11 on the row.
