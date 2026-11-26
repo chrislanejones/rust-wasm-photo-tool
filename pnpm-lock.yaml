@@ -19,8 +19,8 @@ catalogs:
       specifier: ^6.1.1
       version: 6.1.2
     convex:
-      specifier: ^1.50.0
-      version: 1.50.0
+      specifier: ^1.51.0
+      version: 1.51.0
     react:
       specifier: ^19.3.1
       version: 19.3.1
@@ -67,10 +67,10 @@ importers:
         version: 26.6.4
       convex:
         specifier: 'catalog:'
-        version: 1.50.0(@clerk/clerk-react@5.61.9(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)
+        version: 1.51.0(@clerk/clerk-react@5.61.9(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)
       convex-test:
         specifier: ^0.0.62
-        version: 0.0.62(convex@1.50.0(@clerk/clerk-react@5.61.9(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))
+        version: 0.0.62(convex@1.51.0(@clerk/clerk-react@5.61.9(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))
       eslint:
         specifier: ^10.12.0
         version: 10.12.0(jiti@2.7.0)
@@ -142,7 +142,7 @@ importers:
         version: 4.4.2
       convex:
         specifier: 'catalog:'
-        version: 1.50.0(@clerk/clerk-react@5.61.9(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)
+        version: 1.51.0(@clerk/clerk-react@5.61.9(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)
       dexie:
         specifier: ^4.4.7
         version: 4.4.7
@@ -2617,8 +2617,8 @@ packages:
     peerDependencies:
       convex: ^1.43.0
 
-  convex@1.50.0:
-    resolution: {integrity: sha512-WzzCad5hyzU4zzW0ChyUGB3Mil4LgRYMYii9cyQtC24WQnfaRgkZB0IKyhIIgRm1a2IXiGJoZnVYYSfttiap3Q==}
+  convex@1.51.0:
+    resolution: {integrity: sha512-Y5gS+JmT2JBq76S3CrQDrdL/Ijs4ZRKsvz3cu5EmHf/QxW18QrHunb5j9WC6lAbWbWc/gvmqpa5lvXzLXFQVJA==}
     engines: {node: '>=22.0.0', npm: '>=7.0.0'}
     hasBin: true
     peerDependencies:
@@ -6964,11 +6964,11 @@ snapshots:
 
   convert-source-map@2.0.0: {}
 
-  convex-test@0.0.62(convex@1.50.0(@clerk/clerk-react@5.61.9(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)):
+  convex-test@0.0.62(convex@1.51.0(@clerk/clerk-react@5.61.9(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)):
     dependencies:
-      convex: 1.50.0(@clerk/clerk-react@5.61.9(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)
+      convex: 1.51.0(@clerk/clerk-react@5.61.9(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)
 
-  convex@1.50.0(@clerk/clerk-react@5.61.9(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1):
+  convex@1.51.0(@clerk/clerk-react@5.61.9(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1):
     dependencies:
       esbuild: 0.27.0
       prettier: 3.9.9
