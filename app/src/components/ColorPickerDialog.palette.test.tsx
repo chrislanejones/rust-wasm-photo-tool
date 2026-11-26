@@ -142,3 +142,17 @@ it("with no editable palette it is the global palette, as before", () => {
   expect(screen.getByText("Palette (0/32)")).toBeTruthy();
   expect(screen.queryByRole("radiogroup", { name: "Fill Color swatches" })).toBeNull();
 });
+
+it("the wheel and the square are named in US English, for a screen reader too", () => {
+  // QC 11-26-2026: their aria-labels said "Colour wheel" / "Colour square".
+  open(palette());
+  const shapes = within(screen.getByRole("radiogroup", { name: "Picker shape" })).getAllByRole("radio");
+  const names: string[] = [];
+  for (const shape of shapes) {
+    fireEvent.click(shape);
+    for (const el of document.querySelectorAll("[aria-label]")) names.push(el.getAttribute("aria-label")!);
+  }
+  expect(names.filter((n) => /colour/i.test(n))).toEqual([]);
+  expect(names.some((n) => /^Color wheel — /.test(n))).toBe(true);
+  expect(names.some((n) => /^Color square — /.test(n))).toBe(true);
+});
