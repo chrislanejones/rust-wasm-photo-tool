@@ -3,7 +3,7 @@
 // exact button). Its own module because the grid imports the picker, so the
 // picker importing the grid back would be a cycle.
 import type * as React from "react";
-import { Pencil, X } from "lucide-react";
+import { X } from "lucide-react";
 import type { RadioItemProps } from "@/components/ui/use-radio-group";
 
 interface SwatchProps {
@@ -16,11 +16,9 @@ interface SwatchProps {
   active: boolean;
   onClick: () => void;
   onRemove?: () => void;
-  /** Shows a pencil badge (top-left) that replaces this swatch's color —
-   *  the editable Fill Color palette (useEditablePalette). */
-  onEdit?: () => void;
-  /** Accessible name of the edit badge. Defaults to "Replace #hex". */
-  editLabel?: string;
+  /** The × shows all the time, not only on hover or focus — the color
+   *  dialog's palette, which is there to be edited. */
+  removeAlwaysVisible?: boolean;
   disabled?: boolean;
   /** Accessible name. Defaults to "Color #hex" (or the checkerboard's name). */
   label?: string;
@@ -40,8 +38,7 @@ export function Swatch({
   active,
   onClick,
   onRemove,
-  onEdit,
-  editLabel,
+  removeAlwaysVisible = false,
   disabled,
   label,
   removeLabel,
@@ -93,20 +90,6 @@ export function Swatch({
           </span>
         )}
       </button>
-      {onEdit && !disabled && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit();
-          }}
-          className="absolute -top-1 -left-1 hidden group-hover/swatch:flex group-focus-within/swatch:flex items-center justify-center w-3.5 h-3.5 rounded-full bg-theme-sidebar text-theme-muted-foreground border border-theme-border hover:text-theme-foreground"
-          aria-label={editLabel ?? `Replace ${color}`}
-          title="Replace this color"
-        >
-          <Pencil className="h-2 w-2" />
-        </button>
-      )}
       {onRemove && !disabled && (
         <button
           type="button"
@@ -114,7 +97,10 @@ export function Swatch({
             e.stopPropagation();
             onRemove();
           }}
-          className="absolute -top-1 -right-1 hidden group-hover/swatch:flex group-focus-within/swatch:flex items-center justify-center w-3.5 h-3.5 rounded-full bg-theme-sidebar text-theme-muted-foreground border border-theme-border hover:text-theme-foreground"
+          className={[
+            "absolute -top-1 -right-1 items-center justify-center w-3.5 h-3.5 rounded-full bg-theme-sidebar text-theme-muted-foreground border border-theme-border hover:text-theme-foreground",
+            removeAlwaysVisible ? "flex" : "hidden group-hover/swatch:flex group-focus-within/swatch:flex",
+          ].join(" ")}
           aria-label={removeLabel ?? `Remove ${color}`}
         >
           <X className="h-2 w-2" />

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Plus, RotateCcw } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useUserColors } from "@/hooks/useUserColors";
 import { useEditablePalette, MAX_PALETTE_COLORS } from "@/hooks/useEditablePalette";
 import {
@@ -47,10 +47,9 @@ interface Props {
    *  on, a "transparent" entry in `colors` moves to this slot. */
   transparent?: boolean;
   /** Makes the presets an EDITABLE palette stored under this key
-   *  (useEditablePalette): `colors` is what it starts as, every swatch gets a
-   *  replace (pencil) and remove (×) badge, the "+" ADDS the picked color to
-   *  the palette as well as using it, and Reset brings the defaults back.
-   *  Grids sharing a key share the palette. */
+   *  (useEditablePalette): `colors` is what it starts as. It is edited in the
+   *  "+" dialog — × on each color, + to add, Reset, then OK — never on the
+   *  row itself (Chris, 11-25-2026). Grids sharing a key share the palette. */
   paletteKey?: string;
   /** The color carries an OPACITY (Chris, 11-25-2026 — mock-up D): the row's
    *  value slot shows it (100% by default), and while Alt (⌥ Option) is held
@@ -62,14 +61,12 @@ interface Props {
   opacity?: boolean;
 }
 
-// A replace remembers the swatch's COLOR, not its slot: another tab can
-// remove an earlier swatch while the dialog is open, and the slots shift.
-type PickerTarget = { kind: "pick" } | { kind: "add" } | { kind: "replace"; color: string };
+type PickerTarget = { kind: "pick" } | { kind: "add" };
 
 /** One circle in the row's radio group. */
 interface Entry {
   key: string;
-  /** What the swatch IS (its name, its remove/replace target). */
+  /** What the swatch IS (its name). */
   color: string;
   /** What the swatch SHOWS — the lit color swatch at the row's opacity. */
   shows: string;
@@ -77,8 +74,6 @@ interface Entry {
   text?: string;
   active: boolean;
   pick: () => void;
-  onEdit?: () => void;
-  onRemove?: () => void;
   title?: string;
 }
 
@@ -89,7 +84,7 @@ const OPACITY_HINT_SHORT = "Hold Alt (⌥) to change opacity — or click";
 /**
  * A row of preset swatches + the user's saved palette + the transparent
  * (checkerboard) swatch + a "+" that opens the
- * ColorPickerDialog (wheel / square, RGBA / HSL / hex fields). "Use color" in
+ * ColorPickerDialog (wheel / square, RGBA / HSL / hex fields). OK in
  * the dialog applies to THIS control; the dialog's own palette "+" saves to the
  * global list every grid shows (localStorage signed out, Convex signed in).
  */
@@ -105,7 +100,7 @@ export function ColorSwatchGrid({
   paletteKey,
   opacity = false,
 }: Props) {
-  const { userColors, removeColor } = useUserColors();
+  const { userColors } = useUserColors();
   const palette = useEditablePalette(paletteKey ?? "", colors);
   const editable = paletteKey !== undefined;
   const [picker, setPicker] = useState<PickerTarget | null>(null);
@@ -150,10 +145,6 @@ export function ColorSwatchGrid({
   const emit = (c: string) =>
     onChange(opacity && !isTransparent(value) ? keepAlpha(c, value) : c);
 
-  // A preset's index in the STORED palette (presets may have had
-  // "transparent" filtered out of it).
-  const paletteIndex = (color: string) => palette.colors.indexOf(color);
-
   let entries: Entry[];
   if (opacityMode) {
     entries = OPACITY_STEPS.map((n) => ({
@@ -185,11 +176,6 @@ export function ColorSwatchGrid({
           shows: active && opacity ? value : color,
           active,
           pick: () => emit(color),
-          onEdit: editable
-            ? () => setPicker({ kind: "replace", color })
-            : undefined,
-          onRemove:
-            editable && presets.length > 1 ? () => palette.remove(paletteIndex(color)) : undefined,
         };
       }),
       ...saved.map((color) => {
@@ -200,7 +186,6 @@ export function ColorSwatchGrid({
           shows: active && opacity ? value : color,
           active,
           pick: () => emit(color),
-          onRemove: () => removeColor(color),
         };
       }),
       ...(transparent
@@ -230,24 +215,9 @@ export function ColorSwatchGrid({
     onSelect: (id) => entries[radioIds.indexOf(id)]?.pick(),
   });
 
-  const onPick = (color: string) => {
-    if (picker?.kind === "replace") {
-      const was = picker.color;
-      const at = paletteIndex(was);
-      // Gone meanwhile (removed in another tab): nothing to replace.
-      if (at < 0) return;
-      palette.replace(at, color);
-      // Replacing the lit swatch recolors what it was lighting; replacing
-      // another one only edits the palette.
-      if (selected && matches(was)) emit(color);
-      return;
-    }
-    if (picker?.kind === "add") palette.add(color);
-    onChange(color);
-  };
+  const onPick = (color: string) => onChange(color);
 
-  const full = editable && palette.colors.length >= MAX_PALETTE_COLORS;
-  const plusLabel = editable ? `Add a color to ${label}` : "Pick a custom color";
+  const plusLabel = editable ? `Edit ${label} swatches` : "Pick a custom color";
 
   const readout = opacity ? (
     <Tooltip>
@@ -299,8 +269,6 @@ export function ColorSwatchGrid({
                     title={e.title}
                     active={e.active}
                     onClick={e.pick}
-                    onEdit={e.onEdit}
-                    onRemove={e.onRemove}
                     disabled={disabled}
                     radio={radio.itemProps(i)}
                   />
@@ -309,25 +277,15 @@ export function ColorSwatchGrid({
               {allowCustom && !opacityMode && (
                 <SwatchAction
                   onClick={() => setPicker({ kind: editable ? "add" : "pick" })}
-                  disabled={disabled || full}
+                  disabled={disabled}
                   aria-label={plusLabel}
-                  title={full ? `The palette holds ${MAX_PALETTE_COLORS} colors` : undefined}
+                  title={editable ? "Edit swatches" : undefined}
                   aria-haspopup="dialog"
-                  aria-expanded={pickerOpen && picker?.kind !== "replace"}
-                  open={pickerOpen && picker?.kind !== "replace"}
+                  aria-expanded={pickerOpen}
+                  open={pickerOpen}
                   dashed
                 >
                   <Plus className="h-3.5 w-3.5" />
-                </SwatchAction>
-              )}
-              {editable && palette.edited && !opacityMode && (
-                <SwatchAction
-                  onClick={palette.reset}
-                  disabled={disabled}
-                  aria-label={`Reset ${label} to the site colors`}
-                  title="Reset to the site colors"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
                 </SwatchAction>
               )}
             </div>
@@ -341,16 +299,27 @@ export function ColorSwatchGrid({
           onOpenChange={(open) => {
             if (!open) setPicker(null);
           }}
-          initialColor={picker?.kind === "replace" ? picker.color : value}
+          // Opened on a transparent value it would show black at 0%: open
+          // on the row's last solid color instead.
+          initialColor={isTransparent(value) ? base : value}
           onPick={onPick}
           title={
-            picker?.kind === "replace"
-              ? `Replace a ${label} swatch`
-              : picker?.kind === "add"
-                ? `Add a ${label} swatch`
-                : label === "Color"
-                  ? "Pick a color"
-                  : `${label} color`
+            picker?.kind === "add"
+              ? `Edit ${label} swatches`
+              : label === "Color"
+                ? "Pick a color"
+                : `${label} color`
+          }
+          palette={
+            editable
+              ? {
+                  label,
+                  colors: palette.colors,
+                  defaults: colors,
+                  max: MAX_PALETTE_COLORS,
+                  save: palette.set,
+                }
+              : undefined
           }
         />
       )}
