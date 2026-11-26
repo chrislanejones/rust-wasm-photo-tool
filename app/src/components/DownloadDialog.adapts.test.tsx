@@ -20,6 +20,7 @@ vi.hoisted(() => {
 afterAll(() => vi.unstubAllEnvs());
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DownloadDialog } from "./DownloadDialog";
+import { useZipRecipeStore } from "@/stores/useZipRecipeStore";
 import type { DownloadFormatOption } from "@/app/session/useDownloadFormat";
 import type { ActiveFormat } from "@/lib/plugins";
 
@@ -119,4 +120,20 @@ it("All images leaves a one-image plugin format, so the recipe the ZIP uses stay
   onFormatChange.mockClear();
   fireEvent.click(within(dialog).getByRole("radio", { name: "All images (3)" }));
   expect(onFormatChange).toHaveBeenCalledWith("jpeg");
+});
+
+it("with a recipe picked, the footer says nothing about compression, on either scope", () => {
+  // QC 11-26-2026: with Email small picked the footer read "Not compressed"
+  // while the recipe wrote a different, re-encoded file. The line reads the
+  // gallery's Resize & Compress result, which is not what a recipe downloads.
+  useZipRecipeStore.getState().setRecipeId("builtin:email-small");
+  try {
+    renderDialog();
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).queryByTestId("export-compressed")).toBeNull();
+    fireEvent.click(within(dialog).getByRole("radio", { name: "All images (3)" }));
+    expect(within(dialog).queryByTestId("export-compressed")).toBeNull();
+  } finally {
+    useZipRecipeStore.getState().setRecipeId(null);
+  }
 });

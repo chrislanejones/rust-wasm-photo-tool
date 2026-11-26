@@ -346,11 +346,14 @@ function ExportBody({
   // How compressed it is, on the footer's right: the open image's size against
   // its upload (the gallery badge's number, lib/sizeDelta), or how many of the
   // ZIP's images are smaller than their upload. An SVG ZIP is the uploads as
-  // they are, so it says nothing.
+  // they are, so it says nothing. Neither does a recipe: it re-encodes, so the
+  // gallery's number is not what it downloads (QC 11-26-2026).
   const deltaOf = (p: (typeof photos)[number]) => sizeDeltaPercent(p) ?? imageSavings[p.id]?.savingsPercent ?? 0;
   const active = photos.find((p) => p.id === activePhotoId);
   let compressed = "";
-  if (scope === "selected") {
+  if (recipe) {
+    // Left empty: see above.
+  } else if (scope === "selected") {
     const d = active ? deltaOf(active) : 0;
     compressed = d > 0 ? `${d}% compressed` : d < 0 ? `${-d}% larger` : "Not compressed";
   } else if (!allSvg) {
