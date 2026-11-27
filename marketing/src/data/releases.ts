@@ -24,6 +24,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.83",
+    date: "2026-11-27",
+    headline: "Black Friday.",
+    entries: [
+      { tag: "ui", text: "A Black Friday garland replaces the Thanksgiving one, from today through Sunday: black, red and gold flags, a shopping bag and a swinging SALE tag. The × closes it for the year." },
+    ],
+  },
+  {
     version: "v9.82",
     date: "2026-11-26",
     headline: "Happy Thanksgiving, plus a full checkup.",

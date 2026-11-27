@@ -99,27 +99,18 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.82 — 2026-11-26
+### v9.83 — 2026-11-27
 
-**Happy Thanksgiving, plus a full checkup.**
+**Black Friday.**
 
-A "Happy Thanksgiving" garland hangs under the top bar and over the start
-screen this week: pennants, a pumpkin, a maple leaf and a turkey. Click
-the **×** and it stays closed for the year. It takes itself down after
-Sunday and comes back next November without a release.
+The Thanksgiving garland is down, and a Black Friday one is up in its
+place: black, red and gold flags, a red shopping bag, a gold star and a
+SALE tag that swings on its string. It hangs under the top bar and over
+the start screen from today through Sunday. Click the **×** and it stays
+closed for the year. On the dark theme the string has a faint edge so the
+black flags don't disappear into the page.
 
-Everything from v9.70 to v9.81 also got a full QC pass on a production
-build: 345 end-to-end tests, nine new checks, and every link on the
-marketing site. Nothing had broken.
-
-Two small fixes came out of it. With a recipe picked in Export, the footer
-used to say how compressed your image was, and that number was about a
-different file, because the recipe makes its own. Now the footer leaves it
-out while a recipe is picked. And the color dialog's wheel and square told
-screen readers "Colour"; they say "Color" now.
-
-Under the hood: Dexie 4.4.7, Convex 1.51, Playwright 1.65.1 and
-tailwind-merge 3.7.1. A photo saved by the old version opens fine in the
+Nothing else changed. A photo saved by the old version opens fine in the
 new one.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·

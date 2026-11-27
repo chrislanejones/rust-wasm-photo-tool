@@ -12493,3 +12493,16 @@ Verification: run after the trail data regen. TypeScript clean; lint 0 errors (5
 No engine change (980,450 B). No Dexie schema or op-log change.
 
 Verification: run after the trail data regen. TypeScript clean; lint 0 errors (56 warnings); guardrails pass; vitest 2,597/2,597 (clean worktree, no env file); marketing build passes. Production preview (Playwright): the garland shows on the start screen and under the top bar, one "Happy Thanksgiving" image. e2e was not run on #523/#524 (cosmetic, by Chris's call); the full suite passed on #521/#522.
+
+## v9.83 Change Summary — 2026-11-27
+
+**Black Friday.**
+
+| Area | Change |
+| --- | --- |
+| Seasonal (#525) | The Thanksgiving garland becomes a "Black Friday" garland: black, red and gold flags, a red shopping bag with a %, a swinging gold SALE tag and a gold star between the words. It shows from Black Friday (the day after the fourth Thursday of November) through the Sunday after, in local time. The × closes it for the year (`ih_black_friday_banner_closed_<year>`). On the dark theme the string gets a faint light edge. `features/thanksgiving/` → `features/black-friday/`. The shorter message (656 vs 992 px) puts the start screen back on the Halloween breakpoints (1000 / 700 px). |
+| Trail Log | Squares catch up through 11-27. |
+
+No engine change (980,450 B). No Dexie schema or op-log change.
+
+Verification: run after the trail data regen. TypeScript clean; lint 0 errors (56 warnings); guardrails pass; vitest 2,596/2,596 (clean worktree, no env file); marketing build passes. PR #525: 15 checks passed, 0 failed; e2e was not waited on (cosmetic, by Chris's call).
