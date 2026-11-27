@@ -1,1 +1,0 @@
-export { ThanksgivingBanner } from "./ThanksgivingBanner";

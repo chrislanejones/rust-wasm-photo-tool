@@ -1,0 +1,1 @@
+export { BlackFridayBanner } from "./BlackFridayBanner";
