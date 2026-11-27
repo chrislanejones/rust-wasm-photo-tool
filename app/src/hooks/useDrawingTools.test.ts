@@ -206,10 +206,10 @@ describe("panelShapeStyle: which stroke and fill a shape of this kind means", ()
     }
   });
 
-  it("a new shape is filled with the palette's first color and has no stroke", () => {
+  it("a new shape is filled red (the palette's second color) and has no stroke", () => {
     const style = panelShapeStyle(defaultToolSettings, 0);
     expect(style.fillMode).toBe("solid");
-    expect(style.fillColor).toBe(TEXT_COLORS[0]);
+    expect(style.fillColor).toBe(TEXT_COLORS[1]);
     expect(style.strokeWidth).toBe(0);
     // …and the arrow drawn next still has a stroke to be seen by.
     expect(panelShapeStyle(defaultToolSettings, 4).strokeWidth).toBeGreaterThan(0);

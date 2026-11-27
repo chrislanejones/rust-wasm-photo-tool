@@ -106,3 +106,11 @@ sent the engine a width of 0: the slider started at 1.
   for what a width of 0 already says.
 - **Bind the line's color to Fill Color:** a line has no fill; reselecting
   one would have written its stroke into the fill fields of the next square.
+
+## Amendment, 2026-11-27: the default fill is red, not white
+A new blank canvas starts white, so a new white shape on it could not be
+seen. Chris, 11-27-2026: make the default fill red. A new fill-first shape is
+now `TEXT_COLORS[1]` (`#ef4444`), the Fill Color row's second swatch, still
+with no stroke. Same reasoning as before: the built-in row is a constant and
+the user's own colors are added after it, so the second swatch never moves.
+Decision 2's `TEXT_COLORS[0]` (white) is superseded by this.

@@ -79,11 +79,11 @@ it("the star keeps Points, between Fill Color and Corner Radius", () => {
   ]);
 });
 
-it("the default fill is the palette's first color, and it is the one checked", () => {
+it("the default fill is the palette's second color, red, and it is the one checked", () => {
   renderPanel();
   const checked = checkedIn(screen.getByRole("radiogroup", { name: "Fill Color" }));
   expect(checked).toHaveLength(1);
-  expect(defaultToolSettings.shapeFillColor).toBe(TEXT_COLORS[0]);
+  expect(defaultToolSettings.shapeFillColor).toBe(TEXT_COLORS[1]);
   expect(defaultToolSettings.shapeStrokeWidth).toBe(0);
 });
 
@@ -191,16 +191,17 @@ it("Sloppiness says why it does nothing on a strokeless shape, and only then", (
   expect(screen.queryByRole("button", { name: "Sloppiness info" })).toBeNull();
 });
 
-it("the default fill is the Fill Color row's first swatch, white — user colors come after it", () => {
-  // The night-11-19 question: does "the first color you see" ever change? The
-  // built-in row is a constant and ColorSwatchGrid appends the person's own
-  // colors AFTER it, so the first swatch is always TEXT_COLORS[0].
-  expect(TEXT_COLORS[0]).toBe("#ffffff");
-  expect(defaultToolSettings.shapeFillColor).toBe(TEXT_COLORS[0]);
+it("the default fill is the Fill Color row's second swatch, red — not white, which vanishes on a blank canvas", () => {
+  // A new blank canvas starts white, so a white default shape was invisible
+  // (Chris, 2026-11-27). The built-in row is a constant and ColorSwatchGrid
+  // appends the person's own colors AFTER it, so the second swatch is always
+  // TEXT_COLORS[1].
+  expect(TEXT_COLORS[1]).toBe("#ef4444");
+  expect(defaultToolSettings.shapeFillColor).toBe(TEXT_COLORS[1]);
   renderPanel();
   const group = screen.getByRole("radiogroup", { name: "Fill Color" });
-  const firstSwatch = group.querySelector('[role="radio"]')!;
-  expect(firstSwatch.getAttribute("aria-checked")).toBe("true");
+  const secondSwatch = group.querySelectorAll('[role="radio"]')[1]!;
+  expect(secondSwatch.getAttribute("aria-checked")).toBe("true");
 });
 
 it("Fill Color starts as every site color, then the checkerboard, then the +", () => {

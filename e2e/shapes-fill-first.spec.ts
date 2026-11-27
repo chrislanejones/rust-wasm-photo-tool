@@ -109,35 +109,36 @@ test("a new rectangle is its Fill Color and nothing else: no stroke, one undo, a
   expect(await visibleRows(page)).toEqual(["Fill Color", "Corner Radius", "Sloppiness"]);
   await expect(strokeHeader(page)).toHaveAttribute("aria-expanded", "false");
   await expect(strokeHeader(page)).toContainText("None");
-  // The palette's first color is the one checked.
-  await expect(swatch(page, "Fill Color", 0)).toBeChecked();
+  // The palette's second color, red, is the one checked — not white, which a
+  // blank canvas would swallow.
+  await expect(swatch(page, "Fill Color", 1)).toBeChecked();
 
   const paper = await pixels(page, OUTSIDE);
   await drag(page, ...BOX);
   await key(page, "Enter");
   await expect.poll(async () => (await shapes(page)).length).toBe(1);
-  const [white] = await shapes(page);
-  expect(white).toMatchObject({ kind: 0, stroke_width: 0, fill_kind: 1, fill_r: 255, fill_g: 255, fill_b: 255 });
+  const [red] = await shapes(page);
+  expect(red).toMatchObject({ kind: 0, stroke_width: 0, fill_kind: 1, fill_r: 0xef, fill_g: 0x44, fill_b: 0x44 });
   // Filled edge to edge with the fill, and no ink outside the box.
-  expect(await pixels(page, [MIDDLE, ...ON_EDGE])).toEqual(Array(5).fill([255, 255, 255]));
+  expect(await pixels(page, [MIDDLE, ...ON_EDGE])).toEqual(Array(5).fill([0xef, 0x44, 0x44]));
   expect(await pixels(page, OUTSIDE)).toEqual(paper);
 
   // One undo step, and it comes back as it was.
   await key(page, "Control+z");
   await expect.poll(async () => (await shapes(page)).length).toBe(0);
   await key(page, "Control+Shift+z");
-  await expect.poll(() => shapes(page)).toEqual([white]);
+  await expect.poll(() => shapes(page)).toEqual([red]);
 
   // Reselect it (its middle is the shape now) and recolor it from the palette.
   const mid = await screenPoint(page, ...MIDDLE);
   await page.mouse.click(mid.x, mid.y);
   await expect(editBox(page)).toBeAttached();
-  await swatch(page, "Fill Color", 1).click();
+  await swatch(page, "Fill Color", 4).click(); // green, #22c55e
   await key(page, "Enter");
-  await expect.poll(async () => (await shapes(page))[0]?.fill_r).toBe(0xef);
-  const [red] = await shapes(page);
-  expect(red).toMatchObject({ id: white.id, stroke_width: 0, fill_kind: 1, fill_r: 0xef, fill_g: 0x44, fill_b: 0x44 });
-  expect(await pixels(page, [MIDDLE, ...ON_EDGE])).toEqual(Array(5).fill([0xef, 0x44, 0x44]));
+  await expect.poll(async () => (await shapes(page))[0]?.fill_r).toBe(0x22);
+  const [green] = await shapes(page);
+  expect(green).toMatchObject({ id: red.id, stroke_width: 0, fill_kind: 1, fill_r: 0x22, fill_g: 0xc5, fill_b: 0x5e });
+  expect(await pixels(page, [MIDDLE, ...ON_EDGE])).toEqual(Array(5).fill([0x22, 0xc5, 0x5e]));
   expect(await pixels(page, OUTSIDE)).toEqual(paper);
 
   // Past the autosave, a reload resumes the same strokeless shape.
@@ -146,8 +147,8 @@ test("a new rectangle is its Fill Color and nothing else: no stroke, one undo, a
   await page.getByRole("button", { name: /Resume editing/i }).click();
   await expect.poll(() => page.locator("canvas.main-canvas").getAttribute("width")).toBe(String(W));
   await installAnnotationProbe(page);
-  await expect.poll(() => shapes(page)).toEqual([red]);
-  expect(await pixels(page, [MIDDLE, ...ON_EDGE])).toEqual(Array(5).fill([0xef, 0x44, 0x44]));
+  await expect.poll(() => shapes(page)).toEqual([green]);
+  expect(await pixels(page, [MIDDLE, ...ON_EDGE])).toEqual(Array(5).fill([0x22, 0xc5, 0x5e]));
   expect(await pixels(page, OUTSIDE)).toEqual(paper);
 });
 
@@ -170,11 +171,11 @@ test("Stroke opens to Stroke Color then Stroke Width; a color turns it on; the a
   await expect.poll(async () => (await shapes(page)).length).toBe(1);
   const [boxed] = await shapes(page);
   expect(boxed).toMatchObject({
-    kind: 0, stroke_width: 8, r: 0x3b, g: 0x82, b: 0xf6, fill_kind: 1, fill_r: 255, fill_g: 255, fill_b: 255,
+    kind: 0, stroke_width: 8, r: 0x3b, g: 0x82, b: 0xf6, fill_kind: 1, fill_r: 0xef, fill_g: 0x44, fill_b: 0x44,
   });
-  // The stroke is drawn, over the fill.
+  // The stroke is drawn, over the (default red) fill.
   expect(await pixels(page, [MIDDLE, [460, 250], [300, 360]])).toEqual([
-    [255, 255, 255], [0x3b, 0x82, 0xf6], [0x3b, 0x82, 0xf6],
+    [0xef, 0x44, 0x44], [0x3b, 0x82, 0xf6], [0x3b, 0x82, 0xf6],
   ]);
 
   // Shut, the header says what is on.
@@ -235,8 +236,8 @@ test("an outline-only shape from before keeps its style, and a Fill Color fills 
 test("a Fill Color picked with nothing in hand is the next square's fill, and the one after", async ({ page }) => {
   await open(page);
   await shapesTab(page);
-  // Nothing drawn yet: pick red (the palette's second swatch).
-  await swatch(page, "Fill Color", 1).click();
+  // Nothing drawn yet: pick green (not the red default).
+  await swatch(page, "Fill Color", 4).click(); // green, #22c55e
   await drag(page, ...BOX);
   await key(page, "Enter");
   await expect.poll(async () => (await shapes(page)).length).toBe(1);
@@ -245,7 +246,7 @@ test("a Fill Color picked with nothing in hand is the next square's fill, and th
   await key(page, "Enter");
   await expect.poll(async () => (await shapes(page)).length).toBe(2);
   for (const s of await shapes(page)) {
-    expect(s).toMatchObject({ stroke_width: 0, fill_kind: 1, fill_r: 0xef, fill_g: 0x44, fill_b: 0x44 });
+    expect(s).toMatchObject({ stroke_width: 0, fill_kind: 1, fill_r: 0x22, fill_g: 0xc5, fill_b: 0x5e });
   }
 });
 
@@ -265,11 +266,11 @@ test("a Fill Color picked and Enter pressed in the same moment still recolors th
   const mid = await screenPoint(page, ...MIDDLE);
   await page.mouse.click(mid.x, mid.y);
   await expect(page.locator("svg[data-draw-overlay]:not([data-settling])").first()).toBeAttached();
-  const red = await swatch(page, "Fill Color", 1).elementHandle();
-  await red!.evaluate((el) => {
+  const green = await swatch(page, "Fill Color", 4).elementHandle(); // not the red default
+  await green!.evaluate((el) => {
     (el as HTMLElement).click();
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
   });
-  await expect.poll(async () => (await shapes(page))[0]?.fill_r).toBe(0xef);
-  expect((await shapes(page))[0]).toMatchObject({ stroke_width: 0, fill_kind: 1, fill_r: 0xef, fill_g: 0x44, fill_b: 0x44 });
+  await expect.poll(async () => (await shapes(page))[0]?.fill_r).toBe(0x22);
+  expect((await shapes(page))[0]).toMatchObject({ stroke_width: 0, fill_kind: 1, fill_r: 0x22, fill_g: 0xc5, fill_b: 0x5e });
 });
