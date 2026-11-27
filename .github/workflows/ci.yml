@@ -496,7 +496,7 @@ jobs:
       # alone could not say what the page looked like when they failed.
       - name: Keep the failure screenshots
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-failures-shard-${{ matrix.shard }}
           path: test-results/
