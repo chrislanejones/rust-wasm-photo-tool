@@ -4,14 +4,14 @@ Adjacent problems noticed mid-session that stay OUT of that session's
 diff (global CLAUDE.md hard rule 4). One session = one target; these
 wait their turn.
 
-## OPEN — QC 11-26-2026 (`qc/1126`): two things that work as built but may not be what Chris expects
+## DONE — QC 11-26-2026 (`qc/1126`): two things that worked as built, decided by Chris 11-26-2026
 
-Found by `docs/qc/qc-1126.md`. Neither is a regression, and both need a decision, so neither was changed.
+Found by `docs/qc/qc-1126.md`. Neither was a regression.
 
-| Where | What was seen | Why it waits |
+| Where | What was seen | Chris's call |
 |---|---|---|
-| Export footer with a recipe picked (Selected image) | On `paper-1200x900.png` with **Email small** picked, the footer still read **"Not compressed"**, while the file it wrote was a 1024 × 768 JPEG at q70: 5,367 B against the 5,151 B original (4% larger). The footer reads the gallery's saved Resize & Compress result (v9.76 says so), not what the recipe writes | Making it describe the download is the "Estimated file size" idea above, and that idea already says to reuse Resize & Compress's measure |
-| Stroke Stabilizer after a reload | Set High, reload, Resume editing: it is **Off**. `toolSettings` (which holds `paintStabilizer`) is not in `useToolStore`'s persisted `partialize` allowlist, so every session starts Off. Nothing promised otherwise (04-Features says "a single setting", not a saved one) | Saving it means adding a field to a persisted store, so `dexie-migration` rules apply. Chris decides if a shaky hand should have to turn it on each visit |
+| Export footer with a recipe picked | With **Email small** picked, the footer read **"Not compressed"** while the recipe wrote a 1024 × 768 JPEG at q70 (5,367 B against a 5,151 B original). It read the gallery's Resize & Compress result, not the recipe's file | **Hide the line when a recipe is picked** (both scopes). Done in v9.82, test in `DownloadDialog.adapts.test.tsx`. Showing the recipe's real size stays the "Estimated file size" idea below |
+| Stroke Stabilizer after a reload | Set High, reload, Resume editing: it is **Off**. Tool settings are session-only (`partialize` keeps `toolSettings` out) | **Leave as is.** Session-only like every other tool setting. Closed |
 
 ## OPEN — Export dialog leftovers (`feat/export-hierarchy`, 11-24-2026)
 

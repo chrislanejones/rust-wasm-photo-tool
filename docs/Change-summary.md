@@ -12475,3 +12475,21 @@ Verification: run after the trail data regen. TypeScript clean; lint 0 errors (5
 No engine change (980,450 B). No Dexie or op-log change.
 
 Verification: run after the trail data regen. TypeScript clean; lint 0 errors (56 warnings); guardrails pass; vitest 2,572/2,572; marketing build passes. Production preview (Playwright): the row has the edit button; the dialog shows 12 swatches with 12 ×; × then OK leaves 11 on the row.
+
+## v9.82 Change Summary — 2026-11-26
+
+**Happy Thanksgiving, plus a full checkup.**
+
+| Area | Change |
+| --- | --- |
+| Seasonal (#524) | A "Happy Thanksgiving" garland (pennants, pumpkin, maple leaf, turkey), built from the Halloween one. It hangs under the editor's top bar and over the start screen from the Friday before US Thanksgiving through the Sunday after, in local time. The × closes it for the year (`ih_thanksgiving_banner_closed_<year>`). One image to a screen reader; motion respects reduced-motion. New `features/thanksgiving/`. The top bar's `toolbar` role moved onto the bar's own surface so the garland is not one of its controls. |
+| QC (#521) | Full pass on v9.70–v9.81 against a production build: suite 345 passed / 11 skipped / 0 failed, nine new checks (`e2e/archive/qc-1126.spec.ts`), marketing 30 pages / 1,831 links / 0 broken. Report: `docs/qc/qc-1126.md`. |
+| Accessibility (#521) | The color dialog's wheel and square are named "Color wheel — …" / "Color square — …" for a screen reader (were "Colour"). |
+| Export (#523) | With a recipe picked, the footer leaves out its compression line on Selected and on All. It read the gallery's Resize & Compress result, and a recipe re-encodes the file it downloads. |
+| Deps (#522) | dexie 4.4.7, eslint-plugin-react-refresh 0.5.8, tailwind-merge 3.7.1, @playwright/test 1.65.1, convex 1.51.0. Convex's client code is byte-identical to 1.50. A database written by the 4.4.6 build reopens in the 4.4.7 build. Replaces Dependabot #501–#505. |
+| Parking lot (#523) | Both QC items decided: the footer is fixed above; Stroke Stabilizer stays session-only. |
+| Trail Log | Squares catch up through 11-26. |
+
+No engine change (980,450 B). No Dexie schema or op-log change.
+
+Verification: run after the trail data regen. TypeScript clean; lint 0 errors (56 warnings); guardrails pass; vitest 2,597/2,597 (clean worktree, no env file); marketing build passes. Production preview (Playwright): the garland shows on the start screen and under the top bar, one "Happy Thanksgiving" image. e2e was not run on #523/#524 (cosmetic, by Chris's call); the full suite passed on #521/#522.

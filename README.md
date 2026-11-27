@@ -99,20 +99,28 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.81 — 2026-11-25
+### v9.82 — 2026-11-26
 
-**Edit your swatches in one place.**
+**Happy Thanksgiving, plus a full checkup.**
 
-The **+** at the end of the Fill Color row now opens **Edit swatches**. Your
-colors are listed there, the twelve site colors until you change them, each
-with an **×** to take it off. Pick a color on the wheel and press **+** to add
-it, or **Reset** to get the site colors back. Press **OK** to save, or
-**Cancel** to leave everything as it was.
+A "Happy Thanksgiving" garland hangs under the top bar and over the start
+screen this week: pennants, a pumpkin, a maple leaf and a turkey. Click
+the **×** and it stays closed for the year. It takes itself down after
+Sunday and comes back next November without a release.
 
-The row itself is just circles now, with no little pencils and ×s popping up
-when you hover. The color dialog's button says **OK** instead of "Use color",
-and opening it on a see-through fill starts on your last solid color instead
-of black.
+Everything from v9.70 to v9.81 also got a full QC pass on a production
+build: 345 end-to-end tests, nine new checks, and every link on the
+marketing site. Nothing had broken.
+
+Two small fixes came out of it. With a recipe picked in Export, the footer
+used to say how compressed your image was, and that number was about a
+different file, because the recipe makes its own. Now the footer leaves it
+out while a recipe is picked. And the color dialog's wheel and square told
+screen readers "Colour"; they say "Color" now.
+
+Under the hood: Dexie 4.4.7, Convex 1.51, Playwright 1.65.1 and
+tailwind-merge 3.7.1. A photo saved by the old version opens fine in the
+new one.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

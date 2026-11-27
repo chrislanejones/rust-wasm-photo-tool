@@ -194,14 +194,17 @@ test("Q3 Export: each raster format writes what it names, and the dialog works b
   expect(sniff(await bytesOf(dl))).toBe("png");
 });
 
-test("Q4 a recipe on Selected writes its size, format and quality; the footer next to the real file", async ({ page }) => {
+test("Q4 a recipe on Selected writes its size, format and quality; no compression line in the footer", async ({ page }) => {
   await boot(page, [PAPER]);
   const original = readFileSync(PAPER).length;
   await page.keyboard.press("Alt+e");
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Recipe").selectOption("builtin:email-small");
   await page.waitForTimeout(400);
-  const footer = (await dialog.getByTestId("export-compressed").textContent())?.trim() ?? "";
+  // Since v9.82 a recipe hides the footer's compression line (it read the
+  // gallery's number, not the recipe's file).
+  await expect(dialog.getByTestId("export-compressed")).toHaveCount(0);
+  const footer = "(hidden)";
   await page.screenshot({ path: join(SHOTS, "q4-recipe-email-small.png") });
   const [dl] = await Promise.all([
     page.waitForEvent("download"),

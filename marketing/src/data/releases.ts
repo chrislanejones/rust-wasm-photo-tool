@@ -24,6 +24,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.82",
+    date: "2026-11-26",
+    headline: "Happy Thanksgiving, plus a full checkup.",
+    entries: [
+      { tag: "ui", text: "A Happy Thanksgiving garland hangs under the top bar and over the start screen this week. The × closes it for the year." },
+      { tag: "fix", text: "With a recipe picked, Export's footer no longer shows a compression number that was about a different file." },
+      { tag: "fix", text: "The color dialog's wheel and square say Color, not Colour, to a screen reader." },
+      { tag: "infra", text: "A full QC pass on v9.70–v9.81: 345 end-to-end tests, 0 failures, 0 broken links." },
+      { tag: "infra", text: "Dexie 4.4.7, Convex 1.51, Playwright 1.65.1 and tailwind-merge 3.7.1, in one bundle." },
+    ],
+  },
+  {
     version: "v9.81",
     date: "2026-11-25",
     headline: "Edit your swatches in one place.",
