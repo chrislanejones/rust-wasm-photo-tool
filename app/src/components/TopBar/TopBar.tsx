@@ -1,5 +1,5 @@
 // app/src/components/TopBar/TopBar.tsx
-import { ThanksgivingBanner } from "@/features/thanksgiving";
+import { BlackFridayBanner } from "@/features/black-friday";
 import type { ImageMeta } from "@/components/ImageMetaPanel";
 import { motion } from "framer-motion";
 import { slideFromTop, springStandard, instantTransition } from "@/lib/animations";
@@ -184,7 +184,7 @@ export function TopBar({
       >
         <div className="pointer-events-auto relative">
           {/* The toolbar role is on the bar's own surface, not the fixed
-              wrapper, so the Thanksgiving garland below can sit beside the
+              wrapper, so the Black Friday garland below can sit beside the
               toolbar instead of being announced as one of its controls. */}
           <div
             role="toolbar"
@@ -375,11 +375,11 @@ export function TopBar({
               </div>
             </div>
           </div>
-          {/* Around US Thanksgiving only: a "Happy Thanksgiving" garland
+          {/* Black Friday weekend only: a "Black Friday" garland
               hung from the bar's bottom edge, the bar's full length. A
               sibling of the toolbar, not inside it. Renders nothing the rest
-              of the year. See features/thanksgiving. */}
-          <ThanksgivingBanner placement="bar" />
+              of the year. See features/black-friday. */}
+          <BlackFridayBanner placement="bar" />
         </div>
       </motion.div>
     </motion.div>

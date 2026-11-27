@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 //
-// What assistive tech is told about the Thanksgiving garland. Pins the shape
-// of it, not the look: one named image (not seventeen letters), one named
+// What assistive tech is told about the Black Friday garland. Pins the shape
+// of it, not the look: one named image (not eleven letters), one named
 // button, and nothing at all outside the season or once closed. Focus
 // hand-off after closing and the 24px target need real layout, so they are
 // checked in a browser, not here.
@@ -12,12 +12,12 @@ async function load() {
   // The closed state is module-level (shared by both copies), so every test
   // gets a fresh module.
   vi.resetModules();
-  return (await import("./ThanksgivingBanner")).ThanksgivingBanner;
+  return (await import("./BlackFridayBanner")).BlackFridayBanner;
 }
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
-  vi.setSystemTime(new Date(2026, 10, 26, 12));
+  vi.setSystemTime(new Date(2026, 10, 27, 12));
   localStorage.clear();
   vi.stubGlobal(
     "ResizeObserver",
@@ -28,8 +28,8 @@ beforeEach(() => {
   );
 });
 
-const LABEL = "Happy Thanksgiving";
-const CLOSE = "Hide the Thanksgiving banner";
+const LABEL = "Black Friday";
+const CLOSE = "Hide the Black Friday banner";
 
 afterEach(() => {
   cleanup();
@@ -37,15 +37,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("Thanksgiving garland, to a screen reader", () => {
-  it.each(["bar", "centered"] as const)("%s: one image named Happy Thanksgiving and a named close button", async (placement) => {
-    const ThanksgivingBanner = await load();
-    render(<ThanksgivingBanner placement={placement} />);
+describe("Black Friday garland, to a screen reader", () => {
+  it.each(["bar", "centered"] as const)("%s: one image named Black Friday and a named close button", async (placement) => {
+    const BlackFridayBanner = await load();
+    render(<BlackFridayBanner placement={placement} />);
 
     const img = screen.getByRole("img", { name: LABEL });
-    // The letters, pumpkin, leaf and turkey are inside the image and hidden,
+    // The letters, bag, star and tag are inside the image and hidden,
     // so the words are read once, not spelled out.
-    expect(img.querySelector(".thanksgiving-string")?.getAttribute("aria-hidden")).toBe("true");
+    expect(img.querySelector(".black-friday-string")?.getAttribute("aria-hidden")).toBe("true");
     for (const svg of img.querySelectorAll("svg")) expect(svg.getAttribute("aria-hidden")).toBe("true");
 
     const close = screen.getByRole("button", { name: CLOSE });
@@ -53,23 +53,23 @@ describe("Thanksgiving garland, to a screen reader", () => {
     expect(close.className).toContain("btn-icon"); // the 24px `tiny` size, not 20px `xs`
     expect(close.className).not.toContain("btn-icon-xs");
 
-    // The letters spell the message, with a maple leaf between the words and
-    // a pumpkin and a turkey at the ends.
-    const letters = [...img.querySelectorAll(".thanksgiving-flag:not(.thanksgiving-flag-blank)")].map(
+    // The letters spell the message, with a star between the words and
+    // a shopping bag and a sale tag at the ends.
+    const letters = [...img.querySelectorAll(".black-friday-flag:not(.black-friday-flag-blank)")].map(
       (f) => f.textContent,
     );
-    expect(letters.join("")).toBe("HAPPYTHANKSGIVING");
-    expect(img.querySelectorAll(".thanksgiving-gap .thanksgiving-leaf")).toHaveLength(1);
-    expect(img.querySelectorAll(".thanksgiving-pumpkin")).toHaveLength(1);
-    expect(img.querySelectorAll(".thanksgiving-turkey")).toHaveLength(1);
+    expect(letters.join("")).toBe("BLACKFRIDAY");
+    expect(img.querySelectorAll(".black-friday-gap .black-friday-star")).toHaveLength(1);
+    expect(img.querySelectorAll(".black-friday-bag")).toHaveLength(1);
+    expect(img.querySelectorAll(".black-friday-tag")).toHaveLength(1);
   });
 
   it("closing one copy removes both, and it stays closed", async () => {
-    const ThanksgivingBanner = await load();
+    const BlackFridayBanner = await load();
     render(
       <>
-        <ThanksgivingBanner placement="bar" />
-        <ThanksgivingBanner placement="centered" />
+        <BlackFridayBanner placement="bar" />
+        <BlackFridayBanner placement="centered" />
       </>,
     );
     expect(screen.getAllByRole("img", { name: LABEL })).toHaveLength(2);
@@ -87,8 +87,8 @@ describe("Thanksgiving garland, to a screen reader", () => {
 
   it("is not in the page at all outside the season", async () => {
     vi.setSystemTime(new Date(2026, 10, 30, 12));
-    const ThanksgivingBanner = await load();
-    const { container } = render(<ThanksgivingBanner placement="bar" />);
+    const BlackFridayBanner = await load();
+    const { container } = render(<BlackFridayBanner placement="bar" />);
     expect(container.innerHTML).toBe("");
   });
 });

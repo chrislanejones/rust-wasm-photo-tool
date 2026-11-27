@@ -51,7 +51,7 @@
   --z-progress: 100; /* top load-progress bar */
   --z-idle: 200; /* full-screen idle overlay */
   --z-cursor: 45; /* brush cursor / clone source marker — above canvas chrome, below dialogs/overlays */
-  --z-decoration: 47; /* seasonal garland (features/thanksgiving) — above the start screen and editor chrome, below the mobile shell and dialogs; ignores the pointer except its X */
+  --z-decoration: 47; /* seasonal garland (features/black-friday) — above the start screen and editor chrome, below the mobile shell and dialogs; ignores the pointer except its X */
 
   /* ── Dialog scrim — the single source for every modal backdrop. ──
      ⚠️ THIS EXISTED NINE TIMES BEFORE IT EXISTED ONCE. The New dialog, the
@@ -2902,27 +2902,22 @@ input[type="range"].color-range:focus-visible::-moz-range-thumb {
    handles use inline pointer-events, so only !important reaches them. */
 [data-draw-overlay][data-settling] * { pointer-events: none !important; }
 
-/* ── Thanksgiving garland (features/thanksgiving) ─────────────────────────────
-   Seasonal decoration, the days around the fourth Thursday of November. The
-   Halloween garland's layout and pumpkin, in harvest colours. Orange, gold,
-   cranberry and ink are fixed in BOTH themes, like --on-photo: they are the
-   decoration's own colours, not a theme surface. The garland ignores the
-   pointer (only the X is a target), so it can sit over the canvas without
-   blocking anything. */
-.thanksgiving-banner {
-  --thanksgiving-orange: #f28c28;
-  --thanksgiving-orange-deep: #c4610f;
-  --thanksgiving-gold: #e8b23a;
-  --thanksgiving-cranberry: #8e2433;
-  --thanksgiving-red: #b8322a;
-  --thanksgiving-ink: #231a14;
-  --thanksgiving-cream: #fff4e6;
-  --thanksgiving-brown: #6e4122;
-  --thanksgiving-brown-light: #8f5a32;
-  --thanksgiving-stem: #4f6b2d;
+/* ── Black Friday garland (features/black-friday) ─────────────────────────────
+   Seasonal decoration, Black Friday through the Sunday after. The Halloween
+   garland's layout in black, red and gold. Its colours are fixed in BOTH
+   themes, like --on-photo: they are the decoration's own colours, not a theme
+   surface. The garland ignores the pointer (only the X is a target), so it
+   can sit over the canvas without blocking anything. */
+.black-friday-banner {
+  --black-friday-black: #141414;
+  --black-friday-red: #c8102e;
+  --black-friday-red-deep: #9a0c23;
+  --black-friday-gold: #e8b23a;
+  --black-friday-ink: #141414;
+  --black-friday-cream: #fff8ea;
   /* 1 = full size. The bar's string sets its own from its width (see
      Pennants); the start-screen copy steps down on narrow screens below. */
-  --thanksgiving-scale: 1;
+  --black-friday-scale: 1;
   display: flex;
   align-items: flex-start;
   gap: 4px;
@@ -2930,81 +2925,82 @@ input[type="range"].color-range:focus-visible::-moz-range-thumb {
 }
 /* Start screen: a short garland, centered at the very top of the page, so
    the full-size flags clear the logo below them. */
-.thanksgiving-banner-centered {
+.black-friday-banner-centered {
   position: fixed;
   top: 12px;
   left: 50%;
   transform: translateX(-50%);
   z-index: var(--z-decoration);
 }
-@media (max-width: 1200px) {
-  .thanksgiving-banner-centered {
-    --thanksgiving-scale: 0.7;
+@media (max-width: 1000px) {
+  .black-friday-banner-centered {
+    --black-friday-scale: 0.7;
   }
 }
-@media (max-width: 800px) {
-  .thanksgiving-banner-centered {
-    --thanksgiving-scale: 0.42;
-  }
-}
-@media (max-width: 520px) {
-  .thanksgiving-banner-centered {
-    --thanksgiving-scale: 0.27;
+@media (max-width: 700px) {
+  .black-friday-banner-centered {
+    --black-friday-scale: 0.42;
   }
 }
 /* The start screen centers its logo, so a short window brings the logo up
    under the garland: step the flags down with the height too. */
-@media (max-height: 820px) and (min-width: 1201px) {
-  .thanksgiving-banner-centered {
-    --thanksgiving-scale: 0.75;
+@media (max-height: 820px) and (min-width: 1001px) {
+  .black-friday-banner-centered {
+    --black-friday-scale: 0.75;
   }
 }
-@media (max-height: 700px) and (min-width: 801px) {
-  .thanksgiving-banner-centered {
-    --thanksgiving-scale: 0.5;
+@media (max-height: 700px) and (min-width: 701px) {
+  .black-friday-banner-centered {
+    --black-friday-scale: 0.5;
   }
 }
 /* Editor: hung from the top bar's bottom edge and as long as the bar. A child
    of the bar's surface, so it takes the bar's stacking tier and its width. */
-.thanksgiving-banner-bar {
+.black-friday-banner-bar {
   position: absolute;
   top: calc(100% + 2px);
   left: 8px;
   right: 8px;
 }
-.thanksgiving-banner-bar .thanksgiving-garland {
+.black-friday-banner-bar .black-friday-garland {
   flex: 1;
   min-width: 0;
 }
-.thanksgiving-garland {
+.black-friday-garland {
   display: flex;
   align-items: flex-start;
   gap: 6px;
   transform-origin: 50% 0;
-  animation: thanksgiving-sway 6s ease-in-out infinite;
+  animation: black-friday-sway 6s ease-in-out infinite;
 }
-.thanksgiving-banner-bar .thanksgiving-garland {
-  animation-name: thanksgiving-sway-long;
+.black-friday-banner-bar .black-friday-garland {
+  animation-name: black-friday-sway-long;
 }
-.thanksgiving-string {
+.black-friday-string {
   position: relative;
   display: flex;
   align-items: flex-start;
   padding: 0 4px;
 }
-.thanksgiving-string-fill {
+/* Black flags would vanish on the dark theme's near-black page, so there the
+   string gets a faint light edge. A filter on the parent, because the flags'
+   own clip-path would cut off a shadow drawn on them. */
+.dark .black-friday-string {
+  filter: drop-shadow(0 0 1px rgb(255 255 255 / 0.55));
+}
+.black-friday-string-fill {
   flex: 1;
   min-width: 0;
   justify-content: center;
   overflow: hidden;
-  padding-bottom: calc(24px * var(--thanksgiving-scale));
+  padding-bottom: calc(24px * var(--black-friday-scale));
 }
 /* The cord itself: one curve behind the flags, stretched to the string. */
-.thanksgiving-cord {
+.black-friday-cord {
   position: absolute;
   inset: 0 0 auto 0;
   width: 100%;
-  height: calc(40px * var(--thanksgiving-scale));
+  height: calc(40px * var(--black-friday-scale));
   margin-top: -2px;
   overflow: visible;
   fill: none;
@@ -3012,158 +3008,150 @@ input[type="range"].color-range:focus-visible::-moz-range-thumb {
   stroke-width: 2px;
   opacity: 0.7;
 }
-.thanksgiving-flag {
+.black-friday-flag {
   display: flex;
   justify-content: center;
-  /* 52 + 2 + 2 = LETTER_PITCH (56) in ThanksgivingBanner.tsx, times the scale. */
-  width: calc(52px * var(--thanksgiving-scale));
-  height: calc(64px * var(--thanksgiving-scale));
-  margin: 0 calc(2px * var(--thanksgiving-scale));
-  padding-top: calc(8px * var(--thanksgiving-scale));
+  /* 52 + 2 + 2 = LETTER_PITCH (56) in BlackFridayBanner.tsx, times the scale. */
+  width: calc(52px * var(--black-friday-scale));
+  height: calc(64px * var(--black-friday-scale));
+  margin: 0 calc(2px * var(--black-friday-scale));
+  padding-top: calc(8px * var(--black-friday-scale));
   clip-path: polygon(0 0, 100% 0, 50% 100%);
-  background: var(--thanksgiving-orange);
-  color: var(--thanksgiving-ink);
+  background: var(--black-friday-black);
+  color: var(--black-friday-gold);
   font-family: var(--font-sans);
-  font-size: calc(26px * var(--thanksgiving-scale));
+  font-size: calc(26px * var(--black-friday-scale));
   font-weight: 800;
   line-height: 1;
 }
 /* The filler flags either side of the message: smaller, so the words lead. */
-.thanksgiving-flag-blank {
+.black-friday-flag-blank {
   /* 28 + 2 + 2 = BLANK_PITCH (32). */
-  width: calc(28px * var(--thanksgiving-scale));
-  height: calc(36px * var(--thanksgiving-scale));
+  width: calc(28px * var(--black-friday-scale));
+  height: calc(36px * var(--black-friday-scale));
   opacity: 0.85;
 }
-.thanksgiving-flag-gold {
-  background: var(--thanksgiving-gold);
+.black-friday-flag-red {
+  background: var(--black-friday-red);
+  color: var(--black-friday-cream);
 }
-.thanksgiving-flag-cranberry {
-  background: var(--thanksgiving-cranberry);
-  color: var(--thanksgiving-cream);
+.black-friday-flag-gold {
+  background: var(--black-friday-gold);
+  color: var(--black-friday-ink);
 }
-/* The space between the two words: a maple leaf hangs there.
-   40 = GAP_PITCH in ThanksgivingBanner.tsx, times the scale. */
-.thanksgiving-gap {
+/* The space between the two words: a star hangs there.
+   40 = GAP_PITCH in BlackFridayBanner.tsx, times the scale. */
+.black-friday-gap {
   display: flex;
   justify-content: center;
-  width: calc(40px * var(--thanksgiving-scale));
+  width: calc(40px * var(--black-friday-scale));
 }
-.thanksgiving-leaf {
+.black-friday-star {
   flex: none;
-  width: calc(36px * var(--thanksgiving-scale));
-  height: calc(36px * var(--thanksgiving-scale));
-  margin-top: calc(4px * var(--thanksgiving-scale));
-  fill: var(--thanksgiving-red);
+  width: calc(32px * var(--black-friday-scale));
+  height: calc(32px * var(--black-friday-scale));
+  margin-top: calc(6px * var(--black-friday-scale));
+  fill: var(--black-friday-gold);
 }
-/* The pumpkin and turkey at the ends of the cord. */
-.thanksgiving-pumpkin {
+/* The shopping bag and sale tag at the ends of the cord. */
+.black-friday-bag {
   flex: none;
   width: 52px;
   height: 52px;
   margin-top: 2px;
 }
-.thanksgiving-pumpkin-body {
-  fill: var(--thanksgiving-orange-deep);
+.black-friday-bag-body {
+  fill: var(--black-friday-red);
 }
-.thanksgiving-pumpkin-front {
-  fill: var(--thanksgiving-orange);
+.black-friday-bag-handle {
+  fill: none;
+  stroke: var(--black-friday-gold);
+  stroke-width: 2.2px;
+  stroke-linecap: round;
 }
-.thanksgiving-stem {
-  fill: var(--thanksgiving-stem);
+.black-friday-bag-mark {
+  fill: none;
+  stroke: var(--black-friday-cream);
+  stroke-width: 1.8px;
+  stroke-linecap: round;
 }
-.thanksgiving-pumpkin-leaf {
-  fill: var(--thanksgiving-stem);
+.black-friday-bag-dot {
+  fill: var(--black-friday-cream);
 }
-.thanksgiving-turkey {
+.black-friday-tag {
   flex: none;
   width: 60px;
   height: 60px;
-  margin-top: -2px;
-  transform-origin: 50% 92%;
-  animation: thanksgiving-wobble 2.4s ease-in-out infinite;
+  margin-top: -4px;
+  overflow: visible;
+  transform-origin: 10% 5%;
+  animation: black-friday-swing 2.4s ease-in-out infinite;
 }
-.thanksgiving-feather-red {
-  fill: var(--thanksgiving-red);
-}
-.thanksgiving-feather-orange {
-  fill: var(--thanksgiving-orange);
-}
-.thanksgiving-feather-gold {
-  fill: var(--thanksgiving-gold);
-}
-.thanksgiving-turkey-body {
-  fill: var(--thanksgiving-brown);
-}
-.thanksgiving-turkey-head {
-  fill: var(--thanksgiving-brown-light);
-}
-.thanksgiving-turkey-eye {
-  fill: var(--thanksgiving-ink);
-}
-.thanksgiving-turkey-beak {
-  fill: var(--thanksgiving-gold);
-}
-.thanksgiving-turkey-wattle {
-  fill: var(--thanksgiving-red);
-}
-.thanksgiving-turkey-feet {
+.black-friday-tag-string {
   fill: none;
-  stroke: var(--thanksgiving-gold);
-  stroke-width: 1.6px;
+  stroke: var(--text-muted);
+  stroke-width: 1.4px;
   stroke-linecap: round;
 }
-.thanksgiving-close {
+.black-friday-tag-body {
+  fill: var(--black-friday-gold);
+  stroke: var(--black-friday-red-deep);
+  stroke-width: 1px;
+  stroke-linejoin: round;
+}
+.black-friday-tag-hole {
+  fill: var(--black-friday-cream);
+  stroke: var(--black-friday-red-deep);
+  stroke-width: 1px;
+}
+.black-friday-tag-text {
+  fill: var(--black-friday-ink);
+  font-family: var(--font-sans);
+  font-size: 6.6px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+.black-friday-close {
   pointer-events: auto;
 }
-@keyframes thanksgiving-sway {
+@keyframes black-friday-sway {
   0%, 100% { transform: rotate(-1deg); }
   50% { transform: rotate(1deg); }
 }
 /* A long garland rotating even 1° swings its ends ~10px; it bobs instead. */
-@keyframes thanksgiving-sway-long {
+@keyframes black-friday-sway-long {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(1.5px); }
 }
-/* The turkey shifts from foot to foot. */
-@keyframes thanksgiving-wobble {
-  0%, 100% { transform: rotate(-4deg); }
-  50% { transform: rotate(4deg); }
+/* The sale tag swings on its string. */
+@keyframes black-friday-swing {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
 }
 /* Windows High Contrast and other forced-colour modes strip backgrounds,
    which would leave bare letters floating on a cord. The garland is one
    labelled image, so it keeps its own colours there; the X is left to the
    system so it reads as a button in the user's chosen palette. */
 @media (forced-colors: active) {
-  .thanksgiving-garland {
+  .black-friday-garland {
     forced-color-adjust: none;
   }
 }
-/* The pumpkin and turkey follow the start-screen copy down on narrow
-   screens (the leaf already scales with the flags). */
-@media (max-width: 800px) {
-  .thanksgiving-pumpkin {
+/* The bag and tag follow the start-screen copy down on narrow screens (the
+   star already scales with the flags). */
+@media (max-width: 700px) {
+  .black-friday-bag {
     width: 30px;
     height: 30px;
   }
-  .thanksgiving-turkey {
+  .black-friday-tag {
     width: 34px;
     height: 34px;
   }
 }
-@media (max-width: 520px) {
-  .thanksgiving-pumpkin {
-    width: 22px;
-    height: 22px;
-  }
-  .thanksgiving-turkey {
-    width: 26px;
-    height: 26px;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .thanksgiving-garland,
-  .thanksgiving-turkey {
+  .black-friday-garland,
+  .black-friday-tag {
     animation: none;
   }
 }

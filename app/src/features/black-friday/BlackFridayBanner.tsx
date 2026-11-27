@@ -1,13 +1,13 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { isThanksgivingSeason, readDismissed, writeDismissed } from "./season";
+import { isBlackFridaySeason, readDismissed, writeDismissed } from "./season";
 
-const MESSAGE = "HAPPY THANKSGIVING";
+const MESSAGE = "BLACK FRIDAY";
 /** Footprint along the cord at full size, margins included (see
- *  `.thanksgiving-flag*` and `.thanksgiving-gap`, which multiply the same
- *  numbers by `--thanksgiving-scale`). The gap between the words holds a
- *  maple leaf. */
+ *  `.black-friday-flag*` and `.black-friday-gap`, which multiply the same
+ *  numbers by `--black-friday-scale`). The gap between the words holds a
+ *  star. */
 const LETTER_PITCH = 56;
 const BLANK_PITCH = 32;
 const GAP_PITCH = 40;
@@ -16,14 +16,13 @@ const SAG = 20;
 /** Never shrink the letters below this, however narrow the bar. */
 const MIN_SCALE = 0.4;
 /** The letter flags take these colours in turn (see styles.css). */
-const LETTER_COLOURS = ["", " thanksgiving-flag-gold", " thanksgiving-flag-cranberry"];
+const LETTER_COLOURS = ["", " black-friday-flag-red", " black-friday-flag-gold"];
 
 /**
- * A "Happy Thanksgiving" pennant garland: a pumpkin, a string of flags with a
- * maple leaf between the words, and a turkey, shown in the days around the
- * fourth Thursday of November (see season.ts). The artwork and layout are the
- * Halloween garland's (v9.46–v9.47), with the bat swapped for a turkey and
- * the pumpkin's face left off.
+ * A "Black Friday" pennant garland: a shopping bag, a string of flags with a
+ * star between the words, and a sale tag, shown from Black Friday through the
+ * Sunday after (see season.ts). The layout is the Halloween garland's
+ * (v9.46–v9.47), by way of the Thanksgiving one.
  *
  * Two placements, one garland:
  *  - `bar`: hangs under the editor's top bar and runs its full length. It is
@@ -33,39 +32,39 @@ const LETTER_COLOURS = ["", " thanksgiving-flag-gold", " thanksgiving-flag-cranb
  *  - `centered`: the start screen covers the top bar, so it carries its own
  *    copy at the top of the page, just the words.
  *
- * ACCESSIBILITY. The garland is one image named "Happy Thanksgiving"; the
- * flags, pumpkin, leaf and turkey inside it are hidden from assistive tech,
- * so the words are read once rather than letter by letter. The X is a real,
- * named, 24px button with the app's focus ring, and closing it puts focus
- * back on a neighbouring control. The garland's motion (a sway, and the
- * turkey's wobble) stops under reduce-motion, and the X hides it outright
- * (WCAG 2.2.2). The bar copy is a sibling of the top bar's toolbar, not
- * inside it, so it is not announced as a toolbar control.
+ * ACCESSIBILITY. The garland is one image named "Black Friday"; the flags,
+ * bag, star and tag inside it are hidden from assistive tech, so the words
+ * are read once rather than letter by letter. The X is a real, named, 24px
+ * button with the app's focus ring, and closing it puts focus back on a
+ * neighbouring control. The garland's motion (a sway, and the tag swinging)
+ * stops under reduce-motion, and the X hides it outright (WCAG 2.2.2). The
+ * bar copy is a sibling of the top bar's toolbar, not inside it, so it is not
+ * announced as a toolbar control.
  *
  * Decoration only: the garland ignores the pointer, only the X takes a click,
  * and closing either copy closes both and is remembered for the rest of this
  * year's season. Outside the season nothing renders, so no release has to
  * take it down. The motion is CSS animation that the reduce-motion setting
- * and the OS preference both stop (see `.thanksgiving-garland` in styles.css).
+ * and the OS preference both stop (see `.black-friday-garland` in styles.css).
  */
-export function ThanksgivingBanner({ placement }: { placement: "bar" | "centered" }) {
+export function BlackFridayBanner({ placement }: { placement: "bar" | "centered" }) {
   const closed = useSyncExternalStore(subscribe, isClosed);
-  if (closed || !isThanksgivingSeason(new Date())) return null;
+  if (closed || !isBlackFridaySeason(new Date())) return null;
 
   return (
     <div
-      className={`thanksgiving-banner thanksgiving-banner-${placement}`}
-      data-testid={`thanksgiving-banner-${placement}`}
+      className={`black-friday-banner black-friday-banner-${placement}`}
+      data-testid={`black-friday-banner-${placement}`}
     >
-      <div className="thanksgiving-garland" role="img" aria-label="Happy Thanksgiving">
-        <Pumpkin />
+      <div className="black-friday-garland" role="img" aria-label="Black Friday">
+        <ShoppingBag />
         <Pennants fill={placement === "bar"} />
-        <Turkey />
+        <SaleTag />
       </div>
       <Button
         size="tiny"
-        className="thanksgiving-close"
-        aria-label="Hide the Thanksgiving banner"
+        className="black-friday-close"
+        aria-label="Hide the Black Friday banner"
         onClick={(e) => {
           // The X is about to unmount. If it had focus, hand focus to the
           // control just before it rather than dropping it on <body>, where a
@@ -121,20 +120,20 @@ function Pennants({ fill }: { fill: boolean }) {
     // the start-screen copy (scaled by media queries, not here) sags in step.
     const drop = Math.round(SAG * (1 - t * t));
     const tilt = Math.round(-t * 8);
-    const transform = `translateY(calc(${drop}px * var(--thanksgiving-scale))) rotate(${tilt}deg)`;
+    const transform = `translateY(calc(${drop}px * var(--black-friday-scale))) rotate(${tilt}deg)`;
     if (ch === " ")
       return (
-        <span key={i} className="thanksgiving-gap" style={{ transform }}>
-          <MapleLeaf />
+        <span key={i} className="black-friday-gap" style={{ transform }}>
+          <Star />
         </span>
       );
-    // Letters cycle orange, gold, cranberry; the plain filler flags alternate
-    // orange and gold so the words stand out.
+    // Letters cycle black, red, gold; the plain filler flags alternate black
+    // and red so the words stand out.
     const colour = ch ? LETTER_COLOURS[letter++ % LETTER_COLOURS.length] : i % 2 ? LETTER_COLOURS[1] : "";
     return (
       <span
         key={i}
-        className={`thanksgiving-flag${ch ? "" : " thanksgiving-flag-blank"}${colour}`}
+        className={`black-friday-flag${ch ? "" : " black-friday-flag-blank"}${colour}`}
         style={{ transform }}
       >
         {ch}
@@ -145,13 +144,13 @@ function Pennants({ fill }: { fill: boolean }) {
   return (
     <div
       ref={ref}
-      className={fill ? "thanksgiving-string thanksgiving-string-fill" : "thanksgiving-string"}
-      style={fill ? ({ "--thanksgiving-scale": scale } as CSSProperties) : undefined}
+      className={fill ? "black-friday-string black-friday-string-fill" : "black-friday-string"}
+      style={fill ? ({ "--black-friday-scale": scale } as CSSProperties) : undefined}
       aria-hidden
     >
       {/* 40 units tall in a box 40 × scale px tall (styles.css), so a unit is a
           scaled pixel and the curve's middle dips SAG, the same as the flags. */}
-      <svg className="thanksgiving-cord" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden>
+      <svg className="black-friday-cord" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden>
         <path d={`M0 2 Q50 ${2 + SAG * 2} 100 2`} vectorEffect="non-scaling-stroke" />
       </svg>
       {flags}
@@ -200,57 +199,40 @@ function safeStorage(): Storage | undefined {
   }
 }
 
-/** The Halloween pumpkin without its face, plus a leaf on the stem. */
-function Pumpkin() {
+/** A red shopping bag with gold handles and a % on the front. */
+function ShoppingBag() {
   return (
-    <svg className="thanksgiving-pumpkin" viewBox="0 0 32 32" aria-hidden>
-      <path className="thanksgiving-stem" d="M15 4c1-2 4-2 5-1-2 1-3 3-3 5h-2z" />
-      <path className="thanksgiving-pumpkin-leaf" d="M18 7c2-3 6-3 8-1-2 2-5 3-8 1z" />
-      <ellipse className="thanksgiving-pumpkin-body" cx="10.5" cy="19" rx="7.5" ry="10" />
-      <ellipse className="thanksgiving-pumpkin-body" cx="21.5" cy="19" rx="7.5" ry="10" />
-      <ellipse className="thanksgiving-pumpkin-body thanksgiving-pumpkin-front" cx="16" cy="19" rx="7" ry="10.5" />
+    <svg className="black-friday-bag" viewBox="0 0 32 32" aria-hidden>
+      <path className="black-friday-bag-handle" d="M11 12V8.5a5 5 0 0 1 10 0V12" />
+      <path className="black-friday-bag-body" d="M5 11h22l-2 18H7z" />
+      <path className="black-friday-bag-mark" d="M19.5 16.5l-7 9" />
+      <circle className="black-friday-bag-dot" cx="12.8" cy="17.6" r="1.8" />
+      <circle className="black-friday-bag-dot" cx="19.2" cy="24.4" r="1.8" />
     </svg>
   );
 }
 
-/** A maple leaf, hung in the gap between the two words. */
-function MapleLeaf() {
+/** A five-point star, hung in the gap between the two words. */
+function Star() {
   return (
-    <svg className="thanksgiving-leaf" viewBox="0 0 24 24" aria-hidden>
-      <path d="M12 2L13.6 5.8 16.2 4.6 15.6 9.2 19.2 6.8 19.6 9.2 22.4 9.4 20.6 12.8 22 14 17 17.2 17.6 19.4 12.5 18.8V22h-1v-3.2L6.4 19.4 7 17.2 2 14 3.4 12.8 1.6 9.4 4.4 9.2 4.8 6.8 8.4 9.2 7.8 4.6 10.4 5.8z" />
+    <svg className="black-friday-star" viewBox="0 0 24 24" aria-hidden>
+      <path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9.2l7.1-.6z" />
     </svg>
   );
 }
 
-/** A turkey facing out, tail fanned: it takes the bat's place at the end of the cord. */
-function Turkey() {
-  const feathers = [
-    { angle: -64, colour: "thanksgiving-feather-red" },
-    { angle: -32, colour: "thanksgiving-feather-orange" },
-    { angle: 0, colour: "thanksgiving-feather-gold" },
-    { angle: 32, colour: "thanksgiving-feather-orange" },
-    { angle: 64, colour: "thanksgiving-feather-red" },
-  ];
+/** A gold SALE tag on a string: it takes the bat's place at the end of the cord. */
+function SaleTag() {
   return (
-    <svg className="thanksgiving-turkey" viewBox="0 0 40 40" aria-hidden>
-      {feathers.map(({ angle, colour }) => (
-        <ellipse
-          key={angle}
-          className={colour}
-          cx="20"
-          cy="12"
-          rx="4.6"
-          ry="10.5"
-          transform={`rotate(${angle} 20 25)`}
-        />
-      ))}
-      <path className="thanksgiving-turkey-feet" d="M17 32.5v4.5M23 32.5v4.5M15.5 37h3M21.5 37h3" />
-      <ellipse className="thanksgiving-turkey-body" cx="20" cy="26.5" rx="8" ry="8" />
-      <circle className="thanksgiving-turkey-head" cx="20" cy="17" r="4.6" />
-      <circle className="thanksgiving-turkey-eye" cx="18.4" cy="16.2" r="0.85" />
-      <circle className="thanksgiving-turkey-eye" cx="21.6" cy="16.2" r="0.85" />
-      <path className="thanksgiving-turkey-beak" d="M18.8 18.3h2.4L20 20.4z" />
-      <ellipse className="thanksgiving-turkey-wattle" cx="21.4" cy="21.4" rx="0.9" ry="1.9" />
+    <svg className="black-friday-tag" viewBox="0 0 40 40" aria-hidden>
+      <path className="black-friday-tag-string" d="M3 2C6 8 8 13 11.5 20" />
+      <g transform="rotate(-18 20 20)">
+        <path className="black-friday-tag-body" d="M15 9h22v22H15L6 20z" />
+        <circle className="black-friday-tag-hole" cx="11.5" cy="20" r="2" />
+        <text className="black-friday-tag-text" x="26.5" y="22.4" textAnchor="middle">
+          SALE
+        </text>
+      </g>
     </svg>
   );
 }
