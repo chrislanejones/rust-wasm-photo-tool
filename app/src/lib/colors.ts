@@ -60,8 +60,9 @@ export function isTransparent(color: string | null | undefined): boolean {
 
 /** Every color the site ships with, in hue order — what the Fill Color
  *  palette starts as. The user can replace, remove and add to it
- *  (`useEditablePalette`); Reset brings this back. White first, so the
- *  default fill (`TEXT_COLORS[0]`) is still the first swatch. */
+ *  (`useEditablePalette`); Reset brings this back. Starts like TEXT_COLORS
+ *  (white, red), so the default shape fill (`TEXT_COLORS[1]`, red) is the
+ *  second swatch. */
 export const FILL_COLORS = [
   p.white, p.red, p.orange, p.yellow, p.green, p.teal,
   p.cyan, p.blue, p.violet, p.purple, p.pink, p.black,

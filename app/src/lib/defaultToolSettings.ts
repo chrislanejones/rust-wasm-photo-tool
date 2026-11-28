@@ -14,10 +14,10 @@ export const defaultToolSettings: ToolSettings = {
   fillColor2: "#ec4899",
   gradientAngle: 0,
   fillBlock: 16,
-  // A new shape is filled with the palette's first color (white, as the
-  // palette stands) and has no stroke.
+  // A new shape is filled red (the palette's second swatch) and has no stroke.
+  // Not white: a blank canvas starts white, and a white shape on it vanishes.
   shapeFillMode: "solid",
-  shapeFillColor: TEXT_COLORS[0],
+  shapeFillColor: TEXT_COLORS[1],
   shapeStrokeColor: "#000000",
   shapeStrokeWidth: 0,
   sloppiness: 0,
