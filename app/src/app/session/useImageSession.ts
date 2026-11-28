@@ -41,6 +41,7 @@ import { engineWanted, loadEngineIfWanted } from "@/lib/engineGate";
 import { useEngineWanted } from "./useEngineGate";
 import { writeEditArchive } from "./archiveSave";
 import { rememberFileDate } from "@/lib/photoNameFacts";
+import { fingerprintAtImport } from "@/features/gallery/photoFingerprints";
 
 /**
  * How long the idle debounce waits before archiving — v8.35, and the number is
@@ -544,8 +545,18 @@ export function useImageSession({
           // (no IndexedDB read + re-decode). Keyed by content hash.
           putWorkingCopy(originalKey, working);
           // The file's own date, for a rename `{date}` on a photo with no EXIF
-          // date. In memory only — nothing new is stored (lib/photoNameFacts.ts).
+          // date: remembered for this session AND stored on the photo below
+          // (`fileDate`, ADR-112), so it survives a reload.
           rememberFileDate(originalKey, raw.lastModified);
+          // ADR-112: Find duplicates' fingerprint of this FIRST thumbnail, kept
+          // as the photo's original so a later edit can't lose the match.
+          // Hashed BEFORE the row exists, so the row is never patched while
+          // the import or a photo switch is in flight. Only where the engine
+          // is already wanted (a desktop): on a phone the import skips it,
+          // and the first Find duplicates after the window widens stores the
+          // current fingerprint as the original. Nothing can edit a photo on
+          // a phone before that, so it is the same fingerprint.
+          const firstPrint = engineWanted() ? await fingerprintAtImport(thumbBlob) : null;
           const entry: PhotoEntry = {
             id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
             name: f.name.replace(/\.[^.]+$/, ""),
@@ -559,6 +570,10 @@ export function useImageSession({
             thumbBlob,
             originalKey,
             uploadKey: originalKey,
+            ...(Number.isFinite(raw.lastModified) && raw.lastModified > 0 ? { fileDate: raw.lastModified } : {}),
+            ...(firstPrint
+              ? { fingerprintOriginal: firstPrint, fingerprintCurrent: firstPrint, fingerprintThumb: thumbBlob }
+              : {}),
           };
 
           if (svgText !== null) {

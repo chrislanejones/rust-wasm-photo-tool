@@ -22,11 +22,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { DecodedImage } from "@/components/ui/decoded-image";
 import { toast } from "@/components/ui/sonner";
-import { planDuplicates, type GroupPlan } from "@/lib/duplicates";
+import { planDuplicates, type GroupPlan, type Prints } from "@/lib/duplicates";
 import { formatBytes } from "@/lib/format";
 import { photoDims } from "@/lib/selectBy";
 import { useGalleryStore } from "@/stores/useGalleryStore";
-import { fingerprintPhotos } from "./photoFingerprints";
+import { fingerprintPhotos, type StoredPrints } from "./photoFingerprints";
 
 type Scan =
   | { status: "working" }
@@ -47,15 +47,27 @@ export function FindDuplicatesDialog({ open, onOpenChange }: { open: boolean; on
     setTicks(new Set());
     const { photos: list, modifiedPhotos } = useGalleryStore.getState();
     const t0 = performance.now();
-    fingerprintPhotos(list)
+    // ADR-112: a fingerprint computed here is stored on the photo, so the
+    // next opening (and the next reload) hashes nothing; the original rides
+    // beside the current one, so an edited photo still matches its copy.
+    const remember = (id: string, patch: StoredPrints) =>
+      useGalleryStore.getState().setPhotos((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+    fingerprintPhotos(list, { remember })
       .then((fps) => {
         if (!live) return;
+        const prints = new Map<string, Prints>();
+        for (const p of list) {
+          const cur = fps.get(p.id);
+          if (!cur) continue;
+          const orig = p.fingerprintOriginal;
+          prints.set(p.id, orig ? [cur, orig] : cur);
+        }
         const plans = planDuplicates(
           list.map((p) => {
             const { w, h } = photoDims(p);
             return { id: p.id, width: w, height: h, byteSize: p.byteSize, edited: modifiedPhotos.has(p.id) };
           }),
-          fps,
+          prints,
         );
         setScan({ status: "ready", plans, checked: fps.size, ms: Math.round(performance.now() - t0) });
         setTicks(new Set(plans.flatMap((g) => g.ticked)));

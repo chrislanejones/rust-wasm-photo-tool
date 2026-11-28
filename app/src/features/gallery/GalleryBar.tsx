@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Fingerprint } from "@/lib/duplicates";
 import { ModeRing } from "@/components/ui/mode-ring";
 import { motion } from "framer-motion";
 import { slideFromBottom, slideFromLeft, springStandard, instantTransition } from "@/lib/animations";
@@ -53,6 +54,20 @@ export interface PhotoEntry {
    *  25% again at 75), and "Apply Resize" re-encodes at it instead of at 100,
    *  which used to inflate an already-compressed photo several times over. */
   encodeQuality?: number;
+  /** ADR-112. Find duplicates' fingerprint of the FIRST thumbnail, written
+   *  once at import, so an edited photo still matches an untouched copy.
+   *  Optional and not indexed (the gallery manifest is a structured-clone
+   *  store, not Dexie): absent on photos imported before it, which then take
+   *  their current fingerprint as original the first time they are hashed. */
+  fingerprintOriginal?: Fingerprint;
+  /** ADR-112. The fingerprint of `fingerprintThumb`; trusted only while that
+   *  is the same Blob as `thumbBlob` (see features/gallery/photoFingerprints). */
+  fingerprintCurrent?: Fingerprint;
+  fingerprintThumb?: Blob;
+  /** ADR-112. The uploaded file's `lastModified`, for `{date}` with no EXIF
+   *  date. Absent on photos imported before it: `{date}` then falls through
+   *  to today after a reload, as it always did. */
+  fileDate?: number;
 }
 
 

@@ -6,10 +6,18 @@
 // a photo's pixels (an edit saved, a crop, a resize, Paste look) writes a NEW
 // thumbnail Blob, so a stale hash can never be served for a changed photo.
 //
-// ⚠️ Deliberately NOT persisted. Storing the hash on the photo record would
-// be a new IndexedDB field, and that is a Dexie migration (the
-// dexie-migration skill), which is Chris's call. A reload therefore hashes
-// every thumbnail once more — about a millisecond each.
+// ADR-112: STORED on the photo's gallery row, as optional fields (no Dexie
+// bump: the gallery manifest is a plain structured-clone store):
+//   • `fingerprintCurrent` + `fingerprintThumb`: the fingerprint and the very
+//     thumbnail Blob it was computed from. Trusted while `fingerprintThumb`
+//     IS `thumbBlob` — structured clone keeps one Blob one object, so this
+//     holds across a reload, and every path that writes a new thumbnail makes
+//     it stale without having to know about it. A reload hashes nothing.
+//   • `fingerprintOriginal`: written once, at import (`fingerprintAtImport`),
+//     so an edited photo still matches an untouched copy. A photo imported
+//     before ADR-112 gets its current fingerprint as its original the first
+//     time it is hashed: that can't recover a pre-edit original, and the ADR
+//     says so. Nothing is backfilled.
 //
 // Decoding the thumbnail is the browser's job (createImageBitmap, as every
 // other reader of a stored image here does); the downscale, the hash and the
@@ -67,18 +75,33 @@ async function engineFingerprint(): Promise<FingerprintFn> {
  *  thread, so a few in flight overlap; all 100 at once only queues them. */
 const PARALLEL = 6;
 
+/** What `fingerprintPhotos` hands back to be stored on a photo (ADR-112). */
+export type StoredPrints = Pick<PhotoEntry, "fingerprintCurrent" | "fingerprintThumb" | "fingerprintOriginal">;
+
+type FingerprintedPhoto = Pick<PhotoEntry, "id" | "thumbBlob"> & Partial<StoredPrints>;
+
 /**
- * Fingerprints for `photos`, from the cache where the thumbnail is unchanged,
- * computed (and cached) otherwise. A thumbnail that will not decode gets no
- * fingerprint and is left out of the result. Entries for photos no longer in
- * the list are dropped, so the cache never outgrows the gallery.
+ * Fingerprints for `photos`: the one stored on the photo when it was computed
+ * from the current thumbnail, then the in-memory cache, computed (and cached)
+ * otherwise. A computed one is handed to `remember` to be stored on the photo,
+ * with `fingerprintOriginal` too when the photo has none (ADR-112 §6). A
+ * thumbnail that will not decode gets no fingerprint and is left out of the
+ * result. Entries for photos no longer in the list are dropped, so the cache
+ * never outgrows the gallery.
  */
 export async function fingerprintPhotos(
-  photos: readonly Pick<PhotoEntry, "id" | "thumbBlob">[],
-  deps: { fingerprint?: FingerprintFn; decode?: DecodeFn } = {},
+  photos: readonly FingerprintedPhoto[],
+  deps: { fingerprint?: FingerprintFn; decode?: DecodeFn; remember?: (id: string, patch: StoredPrints) => void } = {},
 ): Promise<Map<string, Fingerprint>> {
   const live = new Set(photos.map((p) => p.id));
   for (const id of cache.keys()) if (!live.has(id)) cache.delete(id);
+
+  // Stored and still for this thumbnail: no decode, no engine call.
+  for (const p of photos) {
+    if (p.fingerprintCurrent && p.fingerprintThumb === p.thumbBlob) {
+      cache.set(p.id, { thumb: p.thumbBlob, fp: p.fingerprintCurrent });
+    }
+  }
 
   const todo = photos.filter((p) => cache.get(p.id)?.thumb !== p.thumbBlob);
   if (todo.length > 0) {
@@ -96,6 +119,13 @@ export async function fingerprintPhotos(
           fp = null;
         }
         cache.set(p.id, { thumb: p.thumbBlob, fp });
+        if (fp && deps.remember) {
+          deps.remember(p.id, {
+            fingerprintCurrent: fp,
+            fingerprintThumb: p.thumbBlob,
+            ...(p.fingerprintOriginal ? {} : { fingerprintOriginal: fp }),
+          });
+        }
       }
     };
     await Promise.all(Array.from({ length: Math.min(PARALLEL, todo.length) }, worker));
@@ -107,4 +137,24 @@ export async function fingerprintPhotos(
     if (fp) out.set(p.id, fp);
   }
   return out;
+}
+
+/**
+ * The fingerprint of a photo's FIRST thumbnail, for `fingerprintOriginal`
+ * (ADR-112). Called at import. Waits for the engine the way every lazy reader
+ * does (`importEngine`), so on a phone it makes no engine request until the
+ * window is wide enough to edit, and nothing can be edited before that. Null
+ * when the thumbnail won't decode or fingerprint.
+ */
+export async function fingerprintAtImport(
+  thumb: Blob,
+  deps: { fingerprint?: FingerprintFn; decode?: DecodeFn } = {},
+): Promise<Fingerprint | null> {
+  try {
+    const fingerprint = deps.fingerprint ?? (await engineFingerprint());
+    const { rgba, w, h } = await (deps.decode ?? decodeThumb)(thumb);
+    return toFingerprint(fingerprint(rgba, w, h));
+  } catch {
+    return null;
+  }
 }

@@ -2,11 +2,13 @@
 // `{date}`, the uploaded file name for `{original}`, and the file's own date as
 // `{date}`'s fallback. lib/nameTokens.ts does the formatting; this only reads.
 //
-// Nothing new is stored. The upload name is the `name` the originals store
-// already keeps beside the bytes (putOriginal records `file.name`), read from
-// `uploadKey`, the immutable upload original. The file date (`File.lastModified`)
-// is not stored anywhere, so it is remembered in memory at upload and lasts for
-// this session only; after a reload `{date}` without EXIF falls through to today.
+// The upload name is the `name` the originals store already keeps beside the
+// bytes (putOriginal records `file.name`), read from `uploadKey`, the immutable
+// upload original. The file date (`File.lastModified`) is stored on the photo's
+// gallery row at import (`PhotoEntry.fileDate`, ADR-112), so `{date}` keeps it
+// after a reload. It is also remembered in memory at upload, which is what a
+// photo imported before ADR-112 has for this session only; after a reload such
+// a photo's `{date}` without EXIF falls through to today, as it always did.
 //
 // Cached in memory by key. Keys are SHA-256 content hashes, so what a key's
 // bytes say can never change and the cache never needs invalidating.
@@ -18,7 +20,8 @@ export interface NameFacts {
   original?: string;
   /** EXIF capture time, "YYYY-MM-DD HH:MM". */
   dateTaken?: string;
-  /** `File.lastModified` from the upload, this session only. */
+  /** `File.lastModified` from the upload: stored on the photo (ADR-112), or
+   *  remembered this session for a photo imported before that. */
   fileDate?: number;
 }
 
@@ -26,6 +29,8 @@ export interface NameFacts {
 export interface NameFactsKeys {
   uploadKey?: string;
   originalKey: string;
+  /** The stored file date (`PhotoEntry.fileDate`, ADR-112). */
+  fileDate?: number;
 }
 
 const fileDates = new Map<string, number>();
@@ -76,7 +81,7 @@ export async function loadNameFacts(photo: NameFactsKeys): Promise<NameFacts> {
   } catch {
     stored = {};
   }
-  const fileDate = fileDates.get(key);
+  const fileDate = photo.fileDate ?? fileDates.get(key);
   return fileDate === undefined ? { ...stored } : { ...stored, fileDate };
 }
 
