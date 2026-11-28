@@ -23,7 +23,7 @@ import type { ImageHorseTool, UiStateCapture } from "stamp_tool";
 import type { SavedEdit } from "@/lib/editPersistence";
 import { onOplogFlush } from "@/lib/oplogPersistence";
 import { checkBuildSkew } from "@/lib/pwa/skew";
-import { restoreLayerStack, restoreStoredText } from "@/lib/restoreLayerStack";
+import { isV7Saved, restoreLayerStack, restoreSavedSteps, restoreStoredText } from "@/lib/restoreLayerStack";
 import {
   blitLiveEngine,
   clearLiveCanvas,
@@ -724,49 +724,65 @@ export function useEngineCore(
       // Rebuild the full layer stack (archive v5+) via the shared helper —
       // lib/restoreLayerStack.ts. It is shared with the batch-export path so
       // the two cannot drift; see that file for why (#22).
-      const usedLayers = await restoreLayerStack(
-        tool,
-        saved.layers,
-        saved.activeLayerId,
-        decodePngToRgba,
-      );
-
-      // Re-inject undo snapshots (oldest first — preserves original order).
-      // Each snapshot's annotations are restored one by one so Rust rebuilds
-      // the tile cache (we don't store tile bytes on disk), through the same
-      // `restoreStoredText` as the layers, pointed at the snapshot
-      // (`set_text_restore_target`). The old per-snapshot calls stopped at
-      // `font_id`, so the first undo after this resume lost the box (33a).
-      for (let i = 0; i < saved.undoStack.length; i++) {
-        const snap = saved.undoStack[i];
-        await tool.set_export_quality(snap.exportQuality ?? 75);
-        const { rgba, w, h } = await decodePngToRgba(snap.png);
-        tool.inject_undo_snapshot(
-          new Uint8Array(rgba.buffer as ArrayBuffer),
-          w,
-          h,
-          snap.label,
+      // ADR-112: a v7 record's steps carry their layers. Build each step as a
+      // real document and stash it (steps first, oldest first), then the live
+      // stack WITHOUT clearing that history. Everything older takes the path
+      // below, unchanged.
+      let usedLayers: boolean;
+      if (isV7Saved(saved)) {
+        await restoreSavedSteps(tool, saved, decodePngToRgba);
+        usedLayers = await restoreLayerStack(
+          tool,
+          saved.layers,
+          saved.activeLayerId,
+          decodePngToRgba,
+          { keepHistory: true, keepTextIds: true },
         );
-        if (snap.annotations) {
-          tool.set_text_restore_target(1, i);
-          for (const a of snap.annotations) restoreStoredText(tool, a);
+      } else {
+        usedLayers = await restoreLayerStack(
+          tool,
+          saved.layers,
+          saved.activeLayerId,
+          decodePngToRgba,
+        );
+
+        // Re-inject undo snapshots (oldest first — preserves original order).
+        // Each snapshot's annotations are restored one by one so Rust rebuilds
+        // the tile cache (we don't store tile bytes on disk), through the same
+        // `restoreStoredText` as the layers, pointed at the snapshot
+        // (`set_text_restore_target`). The old per-snapshot calls stopped at
+        // `font_id`, so the first undo after this resume lost the box (33a).
+        for (let i = 0; i < saved.undoStack.length; i++) {
+          const snap = saved.undoStack[i];
+          await tool.set_export_quality(snap.exportQuality ?? 75);
+          const { rgba, w, h } = await decodePngToRgba(snap.png);
+          tool.inject_undo_snapshot(
+            new Uint8Array(rgba.buffer as ArrayBuffer),
+            w,
+            h,
+            snap.label,
+          );
+          if (snap.annotations) {
+            tool.set_text_restore_target(1, i);
+            for (const a of snap.annotations) restoreStoredText(tool, a);
+          }
         }
-      }
 
-      // Re-inject redo snapshots
-      for (let i = 0; i < saved.redoStack.length; i++) {
-        const snap = saved.redoStack[i];
-        await tool.set_export_quality(snap.exportQuality ?? 75);
-        const { rgba, w, h } = await decodePngToRgba(snap.png);
-        tool.inject_redo_snapshot(
-          new Uint8Array(rgba.buffer as ArrayBuffer),
-          w,
-          h,
-          snap.label,
-        );
-        if (snap.annotations) {
-          tool.set_text_restore_target(2, i);
-          for (const a of snap.annotations) restoreStoredText(tool, a);
+        // Re-inject redo snapshots
+        for (let i = 0; i < saved.redoStack.length; i++) {
+          const snap = saved.redoStack[i];
+          await tool.set_export_quality(snap.exportQuality ?? 75);
+          const { rgba, w, h } = await decodePngToRgba(snap.png);
+          tool.inject_redo_snapshot(
+            new Uint8Array(rgba.buffer as ArrayBuffer),
+            w,
+            h,
+            snap.label,
+          );
+          if (snap.annotations) {
+            tool.set_text_restore_target(2, i);
+            for (const a of snap.annotations) restoreStoredText(tool, a);
+          }
         }
       }
 

@@ -65,9 +65,24 @@ pub struct Snapshot {
     /// stored snapshot (`push_annotation_to_*_snapshot`, session restore) clear
     /// it. Empty for every freshly built snapshot.
     pub png: std::cell::OnceCell<Vec<u8>>,
+    /// Each layer's pixel print, computed on first request and cached
+    /// (ADR-112). The saved undo steps pool their layer PNGs by print, and a
+    /// snapshot's pixels never change once pushed (the overlay writers above
+    /// change texts, not pixels), so it is hashed once, not on every save.
+    pub prints: std::cell::OnceCell<Vec<crate::capture::PixelPrint>>,
 }
 
 impl Snapshot {
+    /// The layers' pixel prints, computed once (see `prints`).
+    pub(crate) fn layer_prints(&self) -> &[crate::capture::PixelPrint] {
+        self.prints.get_or_init(|| {
+            self.layers
+                .iter()
+                .map(|l| crate::capture::PixelPrint::of(&l.buf))
+                .collect()
+        })
+    }
+
     /// The flattened PNG, encoded on first use and cached (see `png`).
     pub fn encoded_png(&self) -> &[u8] {
         self.png.get_or_init(|| {
@@ -697,6 +712,7 @@ impl ImageHorseTool {
         self.hist.undo_stack.push_back(Snapshot {
             node,
             png: Default::default(),
+            prints: Default::default(),
             // Reconstructed from the op log — it rebuilds a document, it does
             // not change a setting, so it carries the live quality (ADR-031).
             export_quality: self.export_quality,
@@ -719,6 +735,7 @@ impl ImageHorseTool {
         self.hist.redo_stack.push(Snapshot {
             node,
             png: Default::default(),
+            prints: Default::default(),
             export_quality: self.export_quality,
             label: label.to_string(),
             layers: vec![layer],
@@ -729,6 +746,47 @@ impl ImageHorseTool {
             selection_only: false,
             oplog_cursor: None,
         });
+    }
+
+    /// Move the LIVE document into history as a step (ADR-112): `stack` 1 =
+    /// the top of the undo stack, 2 = the top of the redo stack. The v7 restore
+    /// builds each saved step as a real document (`begin_layer_restore_keep_history`,
+    /// the layers, `finish_layer_restore`) and then stashes it here, oldest
+    /// first, so the step keeps its layers, shapes and text ids — not the one
+    /// flattened layer `inject_undo_snapshot` makes.
+    ///
+    /// The live stack is left as it was (a copy goes in), and the caller builds
+    /// the next step or the live document over it. The undo stack is trimmed
+    /// to the budget after the push, so the oldest steps go first and a restore
+    /// holds no more than a live session could. Returns false, changing
+    /// nothing, for any other `stack`.
+    pub fn stash_live_as_snapshot(&mut self, stack: u8, label: &str) -> bool {
+        if stack != 1 && stack != 2 {
+            return false;
+        }
+        self.hist.generation += 1;
+        let node = self.hist.mint_node();
+        let snap = Snapshot {
+            node,
+            png: Default::default(),
+            prints: Default::default(),
+            export_quality: self.export_quality,
+            label: label.to_string(),
+            layers: self.layers.clone(),
+            active: self.active,
+            width: self.width,
+            height: self.height,
+            selection: None,
+            selection_only: false,
+            oplog_cursor: None,
+        };
+        if stack == 1 {
+            self.hist.undo_stack.push_back(snap);
+            self.hist.trim();
+        } else {
+            self.hist.redo_stack.push(snap);
+        }
+        true
     }
 
     /// Per-snapshot annotation state as JSON (active layer's text annotations).
@@ -772,6 +830,7 @@ mod branch_budget_tests {
         Snapshot {
             node: 0,
             png: Default::default(),
+            prints: Default::default(),
             label: label.to_string(),
             layers: vec![Layer::from_snapshot_pixels(
                 &vec![0u8; px],

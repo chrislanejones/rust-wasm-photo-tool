@@ -584,6 +584,18 @@ pub struct ImageHorseTool {
     /// PNGs the last `capture_state` encoded, reused while their pixels are
     /// unchanged — see `capture::SavePngs`.
     save_pngs: std::cell::RefCell<crate::capture::SavePngs>,
+    /// The undo steps' layer PNGs the last `capture_state` wrote, by pixel
+    /// print, so a step's pixels are encoded once however many saves carry
+    /// them (ADR-112) — `SavePngs`' rule, for history instead of the live
+    /// stack.
+    step_pngs: std::cell::RefCell<crate::capture::StepPngs>,
+    /// Undo steps `capture_state` rebuilt from the op log after a resume,
+    /// kept by (log id, generation, op position) until the log moves on.
+    /// ADR-112 §2.
+    log_steps: std::cell::RefCell<Vec<crate::capture::LogStep>>,
+    /// One-shot id for the next `restore_text_annotation` (ADR-112: a v7
+    /// restore keeps each text's saved id). 0 = mint a fresh one.
+    restore_text_id: u32,
     /// Tile-engine mirror of `composite_cache`, single-document-layer scope
     /// only (see `tiles_flush`). Feature-gated (`tiles`) and NOT part of the
     /// default wasm build — see the `tiles`/`ops` module comments above.
@@ -842,6 +854,7 @@ impl ImageHorseTool {
         Snapshot {
             node: self.hist.current_node(), // the live document's identity
             png: Default::default(),
+            prints: Default::default(),
             label: label.to_string(),
             layers: self.layers.clone(),
             active: self.active,
@@ -1115,6 +1128,9 @@ impl ImageHorseTool {
             height,
             composite_cache: Vec::new(),
             save_pngs: Default::default(),
+            step_pngs: Default::default(),
+            log_steps: Default::default(),
+            restore_text_id: 0,
             #[cfg(feature = "tiles")]
             tile_buf: crate::tiles::TileBuffer::new(width, height),
             hist: History::new(),
@@ -2003,47 +2019,7 @@ impl ImageHorseTool {
         layer.buf.data = flat;
         layer.buf.width = w;
         layer.buf.height = h;
-        layer.text_annotations = texts
-            .iter()
-            .map(|t| {
-                build_text_annotation(
-                    t.id,
-                    &t.text,
-                    t.wrap_width,
-                    t.box_height,
-                    t.perspective,
-                    t.font_size,
-                    t.r,
-                    t.g,
-                    t.b,
-                    t.bold,
-                    t.x,
-                    t.y,
-                    t.rotation_deg,
-                    t.background_kind,
-                    t.bg_r,
-                    t.bg_g,
-                    t.bg_b,
-                    t.bg_a,
-                    t.bg_padding,
-                    t.bg_corner_radius,
-                    t.bg_tail,
-                    t.shadow_box,
-                    t.shadow_text,
-                    t.shadow_r,
-                    t.shadow_g,
-                    t.shadow_b,
-                    t.shadow_a,
-                    t.shadow_dx,
-                    t.shadow_dy,
-                    t.shadow_blur,
-                    &t.font_id,
-                    t.stroke,
-                    t.align,
-                    t.border,
-                )
-            })
-            .collect();
+        layer.text_annotations = texts.iter().map(text_from_params).collect();
         layer.shape_annotations = shapes.iter().map(|s| s.to_annotation()).collect();
         let max_text = layer
             .text_annotations
@@ -5431,4 +5407,48 @@ mod resize_pixels_filter_tests {
             "short buffer"
         );
     }
+}
+
+/// The engine text an op-log `TextParams` describes, id included. The one
+/// conversion: the op-log resume (`oplog_restore_into_engine`) and the undo
+/// steps `capture_state` rebuilds from the log (ADR-112) both use it, so the
+/// two can't disagree about a field.
+#[cfg(feature = "tiles")]
+pub(crate) fn text_from_params(t: &crate::ops::TextParams) -> crate::annotations::TextAnnotation {
+    build_text_annotation(
+        t.id,
+        &t.text,
+        t.wrap_width,
+        t.box_height,
+        t.perspective,
+        t.font_size,
+        t.r,
+        t.g,
+        t.b,
+        t.bold,
+        t.x,
+        t.y,
+        t.rotation_deg,
+        t.background_kind,
+        t.bg_r,
+        t.bg_g,
+        t.bg_b,
+        t.bg_a,
+        t.bg_padding,
+        t.bg_corner_radius,
+        t.bg_tail,
+        t.shadow_box,
+        t.shadow_text,
+        t.shadow_r,
+        t.shadow_g,
+        t.shadow_b,
+        t.shadow_a,
+        t.shadow_dx,
+        t.shadow_dy,
+        t.shadow_blur,
+        &t.font_id,
+        t.stroke,
+        t.align,
+        t.border,
+    )
 }

@@ -89,6 +89,19 @@ export interface SnapEntry {
   /** Live text annotations active at this history step. Optional for
    *  backwards-compat with older persisted entries; omitted ≡ empty. */
   annotations?: PersistedAnnotation[];
+  /** The step's whole layer stack, bottom → top: raw pixels (not the
+   *  composite above), texts with their ids, shapes. ADR-112, archive v7.
+   *  Absent on every step saved before it, and then the step is restored as
+   *  today: one layer from `png`, plus `annotations`.
+   *
+   *  ⚠️ OPTIONAL, AND NOT INDEXED: no `.version()` bump (this store isn't
+   *  Dexie), the reasoning `font_id` gives below. An older build reading a
+   *  record with it ignores it and uses `png`, which is why `png` stays.
+   *  Steps whose pixels are the same share ONE `Uint8Array`, so structured
+   *  clone stores them once. */
+  layers?: PersistedLayer[];
+  /** Id of the active layer within `layers`. */
+  activeLayerId?: number;
 }
 
 /** One live (non-destructive) text annotation. Mirrors the JSON shape
@@ -258,6 +271,8 @@ interface LayerMeta {
 /** Everything one `capture_state()` call hands back, already decoded into the
  *  shapes the two save paths were building by hand. */
 export interface CapturedState {
+  /** 7 when the steps carry their layers (capture v3, ADR-112). */
+  archiveVersion?: number;
   canvasW: number;
   canvasH: number;
   /** Committed export quality; absent in legacy captures/archives. */
@@ -273,7 +288,13 @@ export interface CapturedState {
 }
 
 const CAPTURE_MAGIC = 0x49484353; // "IHCS"
-const CAPTURE_VERSION = 2;
+/** v3 (ADR-112) appends the STEP trailer: each step's layer stack. */
+const CAPTURE_VERSION = 3;
+/** STEP `png_ref`: "this step's own composite PNG" (see src/capture.rs). */
+const SAME_AS_COMPOSITE = 0xffffffff;
+/** STEP pool entry kinds (see src/capture.rs). */
+const POOL_BYTES = 0;
+const POOL_LIVE_LAYER = 1;
 
 /**
  * Decode the engine's one-call state capture. ADR-024 Stage 3.5.
@@ -317,7 +338,7 @@ export function decodeCapture(blob: Uint8Array): CapturedState {
 
   const magic = u32();
   const version = u32();
-  if (magic !== CAPTURE_MAGIC || (version !== 1 && version !== CAPTURE_VERSION)) {
+  if (magic !== CAPTURE_MAGIC || version < 1 || version > CAPTURE_VERSION) {
     // Loud, not silent. A mismatch means the wasm and the JS disagree about
     // the frame — almost always a stale `pkg/` — and a half-decoded archive
     // written to IndexedDB is far worse than a failed save.
@@ -382,6 +403,51 @@ export function decodeCapture(blob: Uint8Array): CapturedState {
     for (const snapshot of redoStack) snapshot.exportQuality = u32();
   }
 
+  // v3 (ADR-112): the STEP trailer. A pooled PNG is ONE object shared by
+  // every step that names it (and by the live layer, when it is that layer's
+  // pixels), so the local record's structured clone stores it once.
+  if (version >= 3) {
+    const f64 = () => {
+      const v = dv.getFloat64(p, true);
+      p += 8;
+      return v;
+    };
+    const pool: Uint8Array[] = [];
+    const poolCount = u32();
+    for (let i = 0; i < poolCount; i++) {
+      const kind = u32();
+      if (kind === POOL_BYTES) pool.push(bytes());
+      else if (kind === POOL_LIVE_LAYER) {
+        const live = layers[u32()];
+        if (!live) throw new Error("capture_state STEP pool names a layer the frame doesn't have");
+        pool.push(live.png);
+      } else throw new Error(`capture_state STEP pool kind ${kind} unknown`);
+    }
+    for (const step of [...undoStack, ...redoStack]) {
+      const n = u32();
+      const stepLayers: PersistedLayer[] = [];
+      for (let i = 0; i < n; i++) {
+        const id = u32();
+        const name = text();
+        const visible = u32() !== 0;
+        const opacity = f64();
+        const ref = u32();
+        const png = ref === SAME_AS_COMPOSITE ? step.png : pool[ref];
+        if (!png) throw new Error(`capture_state STEP names pooled PNG ${ref}, pool has ${pool.length}`);
+        stepLayers.push({
+          id, name, visible, opacity, png,
+          annotations: parseSnapshotAnnotations(text()),
+          shapes: parseShapes(text()),
+        });
+      }
+      const active = u32();
+      if (stepLayers.length > 0) {
+        step.layers = stepLayers;
+        step.activeLayerId = active;
+      }
+    }
+  }
+
   if (p !== blob.byteLength) {
     throw new Error(
       `capture_state frame not fully consumed (${p} of ${blob.byteLength} bytes) — ` +
@@ -390,6 +456,7 @@ export function decodeCapture(blob: Uint8Array): CapturedState {
   }
 
   return {
+    ...(version >= 3 ? { archiveVersion: 7 } : {}),
     canvasW,
     canvasH,
     exportQuality,
@@ -435,6 +502,9 @@ export interface SavedEdit {
   layers?: PersistedLayer[];
   /** Id of the active layer within `layers`. */
   activeLayerId?: number;
+  /** 7 when the steps may carry `layers` (ADR-112). Absent on every record
+   *  written before it; the restore path then takes today's route. */
+  archiveVersion?: number;
 }
 
 /** The tile cache the engine re-renders on restore. The ONLY thing either
@@ -553,6 +623,7 @@ export async function savePhotoEdit(
   // document is read while the engine cannot change, which is the property the
   // old run of separate reads had only by virtue of being synchronous.
   const {
+    archiveVersion,
     canvasW,
     canvasH,
     exportQuality,
@@ -566,6 +637,7 @@ export async function savePhotoEdit(
   } = decodeCapture(await t.capture_state());
 
   await idbSet<SavedEdit>(`edit-${photoId}`, {
+    ...(archiveVersion ? { archiveVersion } : {}),
     canvasW,
     canvasH,
     exportQuality,
