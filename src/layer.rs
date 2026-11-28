@@ -2106,6 +2106,35 @@ impl ImageHorseTool {
         self.next_shape_id = 1;
         self.text_restore_target = (0, 0);
         self.next_layer_id = 1;
+        self.restore_text_id = 0;
+    }
+
+    /// `begin_layer_restore` WITHOUT clearing history, for the v7 restore
+    /// (ADR-112): each saved step is rebuilt as the live document and then
+    /// moved into history with `stash_live_as_snapshot`, so the history built
+    /// so far has to survive the next step's rebuild.
+    ///
+    /// The text and shape id counters are NOT reset here: they only grow, so
+    /// an id handed out in one step is never handed out again in a later step
+    /// or the live document. (`restore_snapshot` does not touch the counters,
+    /// so a reset would let an undo bring back a text whose id the next new
+    /// text then reuses.) Layer ids do restart: each step is its own stack.
+    pub fn begin_layer_restore_keep_history(&mut self) {
+        self.layers.clear();
+        self.editing_shape_id = None;
+        self.editing_text_id = None;
+        self.text_restore_target = (0, 0);
+        self.next_layer_id = 1;
+        self.restore_text_id = 0;
+    }
+
+    /// Make the NEXT `restore_text_annotation` use `id` instead of minting one
+    /// (ADR-112: a v7 restore keeps each text's saved id). One-shot: the call
+    /// after that mints again. `next_text_id` moves past `id`, so no later text
+    /// can collide with it. An id already on the target layer is not reused;
+    /// that text gets a fresh one instead. 0 clears it.
+    pub fn set_text_restore_id(&mut self, id: u32) {
+        self.restore_text_id = id;
     }
 
     /// Append a restored layer (bottom → top order) from raw RGBA `pixels` and
@@ -2260,8 +2289,19 @@ impl ImageHorseTool {
         border_b: u8,
         border_a: u8,
     ) -> u32 {
-        let id = self.next_text_id;
-        self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
+        let wanted = std::mem::take(&mut self.restore_text_id);
+        let taken = wanted != 0
+            && self
+                .text_restore_layer()
+                .is_some_and(|l| l.text_annotations.iter().any(|a| a.id == wanted));
+        let id = if wanted != 0 && !taken {
+            self.next_text_id = self.next_text_id.max(wanted.wrapping_add(1).max(1));
+            wanted
+        } else {
+            let id = self.next_text_id;
+            self.next_text_id = self.next_text_id.wrapping_add(1).max(1);
+            id
+        };
         let quad = if perspective.len() == 8 {
             [
                 (perspective[0], perspective[1]),
@@ -2341,6 +2381,21 @@ impl ImageHorseTool {
                 id
             }
             None => 0,
+        }
+    }
+
+    /// The layer the next `restore_text_annotation` writes to, read-only.
+    fn text_restore_layer(&self) -> Option<&Layer> {
+        match self.text_restore_target {
+            (0, _) => self.layers.get(self.active),
+            (stack, index) => {
+                let snap = if stack == 1 {
+                    self.hist.undo_stack.get(index)
+                } else {
+                    self.hist.redo_stack.get(index)
+                };
+                snap.and_then(|s| s.layers.get(s.active))
+            }
         }
     }
 

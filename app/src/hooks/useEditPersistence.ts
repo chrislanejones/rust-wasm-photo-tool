@@ -22,7 +22,7 @@ import { useUIStore } from "@/stores/useUIStore";
 import { mayUpload, recordUpload, isUploadRetryEnabled } from "@/lib/uploadBudget";
 import { withTimeout as withTimeoutMs } from "@/lib/withTimeout";
 
-import { encodeArchive, decodeArchive, looksLikePng } from "@/lib/editArchive";
+import { encodeArchive, readArchive, looksLikePng } from "@/lib/editArchive";
 
 // ── Hook ───────────────────────────────────────────────────────────────────
 
@@ -458,7 +458,19 @@ export function useEditPersistence() {
             const resp = await fetch(edit.downloadUrl);
             const data = new Uint8Array(await resp.arrayBuffer());
             try {
-              return decodeArchive(data);
+              const read = readArchive(data);
+              if (read.kind === "newer") {
+                // Made by a newer Image Horse than this one (ADR-112 §4).
+                // Nothing was read and nothing is changed: the cloud copy is
+                // left for the build that can read it, and this one falls
+                // back to the copy in this browser.
+                logDiagnostic(
+                  "CONVEX_DB",
+                  `The cloud copy of this photo was made by a newer version of Image Horse (archive v${read.version}). Reload to update; using the copy stored in this browser.`,
+                );
+                return null;
+              }
+              return read.edit;
             } catch (err) {
               // A decode failure used to fall through to "it must be a legacy
               // single-PNG blob", which is true for exactly one kind of failure

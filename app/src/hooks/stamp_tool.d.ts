@@ -945,6 +945,14 @@ declare module "stamp_tool" {
      *  `push_annotation_to_undo_snapshot` / `_redo_snapshot`, which dropped
      *  the box, the quad, the shadow and the outline (33a). */
     set_text_restore_target(stack: number, index: number): void;
+    /** ADR-112: move the LIVE document into history as a step (1 = undo top,
+     *  2 = redo top), keeping its layers, shapes and text ids. The v7 restore
+     *  builds each saved step live, then stashes it here, oldest first. The
+     *  undo stack is trimmed to the budget after. False for any other stack. */
+    stash_live_as_snapshot(stack: number, label: string): boolean;
+    /** ADR-112: the next `restore_text_annotation` uses `id` (one-shot), so a
+     *  v7 restore keeps each text's saved id. 0 clears it. */
+    set_text_restore_id(id: number): void;
 
     // Item 9: Crop preview in WASM
     // Uncomment after adding the Rust implementations
@@ -1312,6 +1320,9 @@ declare module "stamp_tool" {
     get_layer_shape_annotations(index: number): string;
     /** Begin rebuilding the stack from persisted data (empties stack + history). */
     begin_layer_restore(): void;
+    /** ADR-112: `begin_layer_restore` WITHOUT clearing history, and without
+     *  resetting the text/shape id counters (they only grow). */
+    begin_layer_restore_keep_history(): void;
     /** Append a restored layer from raw RGBA; makes it active. Returns its id. */
     push_restored_layer(
       pixels: Uint8Array,

@@ -2381,6 +2381,10 @@ pub const KEYFRAMES_IN_MEMORY: usize = 3;
 /// while the cursor is rewound drops the tail first (truncate-on-branch —
 /// linear history for now). [`truncate`](Self::truncate) is the hard drop.
 pub struct OpLog {
+    /// Names THIS log for caches outside it (ADR-112: the saved undo steps
+    /// `capture_state` rebuilds from a log are kept by log id, generation and
+    /// op position). Minted per log, never persisted, never reused.
+    id: u64,
     ops: Vec<Op>,
     /// `(op_count_at_snapshot, document_state_after_that_many_ops)`.
     keyframes: Vec<(usize, Document)>,
@@ -2395,7 +2399,51 @@ pub struct OpLog {
     generation: u64,
 }
 
+/// Source of [`OpLog`] ids.
+static NEXT_LOG_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
 impl OpLog {
+    /// This log's id (see the field).
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+
+    /// Hand `f` the document after exactly `n` ops for each `n` in
+    /// `positions` (ascending, each `<= len()`), in ONE forward pass from the
+    /// nearest keyframe at or before the first. ADR-112: how `capture_state`
+    /// rebuilds the undo steps an op-log resume left only in the log. A
+    /// position out of order or out of range is skipped.
+    pub fn for_each_document_at(&self, positions: &[usize], mut f: impl FnMut(usize, &Document)) {
+        let Some(&first) = positions.first() else {
+            return;
+        };
+        if first > self.ops.len() {
+            return;
+        }
+        // The index-0 keyframe always exists; a log without one has nothing
+        // to give, so it gives nothing rather than panic.
+        let Some((kf_idx, base)) = self
+            .keyframes
+            .iter()
+            .filter(|(idx, _)| *idx <= first)
+            .max_by_key(|(idx, _)| *idx)
+        else {
+            return;
+        };
+        let mut doc = base.clone();
+        let mut at = *kf_idx;
+        for &n in positions {
+            if n < at || n > self.ops.len() {
+                continue;
+            }
+            for op in &self.ops[at..n] {
+                apply(op, &mut doc);
+            }
+            at = n;
+            f(n, &doc);
+        }
+    }
+
     /// A new log over an empty `width`×`height` canvas. Index-0 keyframe is the
     /// initial empty state.
     pub fn new(width: u32, height: u32) -> Self {
@@ -2408,6 +2456,7 @@ impl OpLog {
     /// everything after).
     pub fn with_base(base: Document) -> Self {
         Self {
+            id: NEXT_LOG_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             ops: Vec::new(),
             keyframes: vec![(0, base.clone())],
             live: base,

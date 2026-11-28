@@ -154,6 +154,76 @@ async function leaveForPins(page: Page) {
   await expect(editor(page)).toHaveCount(0);
 }
 
+/** The saved edit records in this browser: the most undo steps any holds,
+ *  and how many op-log manifests are live (not retired). */
+const savedSteps = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<{ undo: number; logs: number }>((resolve) => {
+        const out = { undo: 0, logs: 0 };
+        const edits = indexedDB.open("image-horse-edits");
+        edits.onsuccess = () => {
+          const db = edits.result;
+          const all = db.transaction("edits", "readonly").objectStore("edits").getAll();
+          all.onsuccess = () => {
+            for (const r of all.result as { undoStack?: unknown[] }[]) out.undo = Math.max(out.undo, r.undoStack?.length ?? 0);
+            db.close();
+            const dx = indexedDB.open("image-horse-dexie");
+            dx.onsuccess = () => {
+              const d = dx.result;
+              const m = d.transaction("oplogManifests", "readonly").objectStore("oplogManifests").getAll();
+              m.onsuccess = () => {
+                out.logs = (m.result as { stale?: boolean }[]).filter((x) => !x.stale).length;
+                d.close();
+                resolve(out);
+              };
+            };
+          };
+        };
+      }),
+  );
+
+/** Delete every saved edit record (not the op logs). */
+const clearSavedEdits = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const req = indexedDB.open("image-horse-edits");
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction("edits", "readwrite");
+          tx.objectStore("edits").clear();
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+        };
+      }),
+  );
+
+/** Retire every saved op log, as the app does when it can't trust one, so
+ *  the next resume reads the saved edit record (qc-1113's `waitAndReload`). */
+const retireLog = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const req = indexedDB.open("image-horse-dexie");
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction("oplogManifests", "readwrite");
+          const store = tx.objectStore("oplogManifests");
+          const all = store.getAll();
+          all.onsuccess = () => {
+            for (const m of all.result) store.put({ ...m, stale: true });
+          };
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+        };
+      }),
+  );
+
 /** Wait out the autosave, reload, resume. Until the resumed photo stops
  *  loading (the panel's aria-busy), the app drops an undo press on purpose
  *  (`isPhotoSwitching`), so nothing is pressed before then. */
@@ -298,14 +368,12 @@ test.describe("undoing a text's Placement never loses work (Night 10-24 §1)", (
     expect((await oplog(page)).broken).toBe(false);
   });
 
-  // Red on master, and still red: a fallback undo after a reload restores a
-  // FLATTENED picture of the step — the saved undo steps keep pixels and a
-  // text list, no shapes and no layer stack (capture.rs, useEngineCore.ts) —
-  // and a broken log is never persisted, so there is no log to rebuild from.
-  // Fixing it changes the saved-edit format: written up as ADR-093 (proposed),
-  // not half-fixed here. Night 10-24's fix keeps the log from breaking on a
-  // Placement undo, which is what sent the callout case down this path.
-  test.fixme("4 — the log forced broken: a fallback undo after a reload drops no object", async ({ page }) => {
+  // Was `test.fixme` from 10-24 to 11-28: a fallback undo after a reload
+  // restored a FLATTENED picture of the step (pixels and a text list, no
+  // shapes, no layers), and a broken log is never persisted, so there was no
+  // log to rebuild from. ADR-112 (archive v7): each saved step keeps its
+  // layers, so the fallback gives the objects back.
+  test("4 — the log forced broken: a fallback undo after a reload drops no object", async ({ page }) => {
     await open(page);
     await placeCallout(page, "Crack");
     const withCallout = await layer(page);
@@ -324,6 +392,40 @@ test.describe("undoing a text's Placement never loses work (Night 10-24 §1)", (
     await key(page, "Control+z");
     await key(page, "Control+z");
     await expect.poll(async () => objects(await layer(page))).toEqual(objects(withCallout));
+  });
+
+  // ADR-112 §2 (qc-1113 Q2d/Q2e): after an op-log resume the next saved edit
+  // had NO undo history, so once the log was retired a reload came back with
+  // undo 0. Red on master at the first poll: the saved record's undo stays 0.
+  test("6 — op-log resume, save, log retired, reload: undo still gives the shape back", async ({ page }) => {
+    test.setTimeout(180_000);
+    await open(page);
+    await addRect(page, 700, 150);
+    const withRect = await layer(page);
+    await addText(page, "After", { x: 300, y: 500 });
+    const edited = await layer(page);
+    expect((await oplog(page)).undo).toBe(2);
+
+    await reloadAndResume(page); // the op-log resume
+    expect(objects(await layer(page))).toEqual(objects(edited));
+    expect((await savedSteps(page)).logs, "the log was what resumed").toBeGreaterThan(0);
+    // The save written AFTER that resume carries the two steps the log held.
+    // The record from before the reload is cleared first, so what is read
+    // below can only be that later save.
+    await clearSavedEdits(page);
+    await expect
+      .poll(async () => (await savedSteps(page)).undo, { timeout: 30_000, message: "saved record's undo steps" })
+      .toBe(2);
+
+    await retireLog(page);
+    await reloadAndResume(page); // the archive resume
+    expect(objects(await layer(page))).toEqual(objects(edited));
+    expect((await oplog(page)).undo, "undo after the archive resume").toBe(2);
+    await key(page, "Control+z");
+    await expect.poll(async () => objects(await layer(page))).toEqual(objects(withRect));
+    expect((await layer(page)).shapes, "the rect is an object again, not ink").toHaveLength(1);
+    await key(page, "Control+z");
+    await expect.poll(async () => (await layer(page)).shapes).toHaveLength(0);
   });
 
   test("5 — Text tool → Pins right after a Placement pushes no empty undo step", async ({ page }) => {

@@ -194,10 +194,43 @@ Nothing in v7 writes or reads `BRCH`; the section table is what reserves it.
 | Rust: `capture_state` v3 carries each step's shapes, and step pixels are pooled | v2 has no step layers |
 | PR B: `{date}` after reload; edited photo still groups with its original; old photos open and hash once; fingerprints not recomputed when stored; Dexie still v20 | see PR B |
 
-## Measured
+## Measured (11-28, cloud box, 4 cores, release wasm under Node 22)
 
-Filled in by `feat/243-archive-keeps-shapes` before it was pushed: see
-"Measured (11-28)" at the end of this file.
+`capture_state` on a 2078 × 2078 photo (the size `strokeGate.ts` uses), master
+`6440463` against `feat/243-archive-keeps-shapes`. "First save" encodes every
+step; "next save" is the same document saved again (everything cached).
+
+| Document | Frame bytes | First save | Next save |
+|---|---|---|---|
+| 10 shapes | 66,675,747 → 66,693,705 (**+0.03%**) | 1,225 → 1,307 ms | 84 → 83 ms |
+| 5 brush strokes | 38,650,580 → 38,650,854 (+274 B) | 621 → 666 ms | 48 → 50 ms |
+| 5 shapes, then 5 strokes | 66,197,447 → 93,965,853 (**+42%**) | 1,222 → 1,778 ms (**+46%**) | 91 → 127 ms |
+
+What the three rows say:
+
+- **Shape and text edits cost nothing extra.** A shape edit doesn't change the
+  layer's pixels, so all ten steps name ONE pooled PNG, and that PNG is the live
+  layer's, already in the frame (`POOL_LIVE_LAYER`).
+- **Pixel edits on a layer with no overlays cost nothing extra.** The step's
+  composite IS its layer, so the step names its own composite
+  (`SAME_AS_COMPOSITE`) and nothing is encoded twice.
+- **The cost is pixel edits made while overlays are on the layer**: each such
+  step carries its raw layer beside its composite. That is the row ADR-093's
+  pre-mortem was about, measured: +42% bytes, +46% on a cold save, +36 ms on a
+  warm one, at 2078². The local record pays it in IndexedDB bytes; structured
+  clone stores a pooled PNG once, so shape-only history adds nothing there
+  either.
+
+**Engine size:** 980,598 → 1,005,963 B (**+25,365 B**). Of that, the log
+rebuild (§2) is 17,008 B (measured by building with it switched off: 988,955 B)
+and the STEP trailer, `stash_live_as_snapshot`, `begin_layer_restore_keep_history`
+and `set_text_restore_id` the other 8,357 B. Keeping the three rebuild helpers
+out of line saved 30 B, so it wasn't kept. The deploy sentinel has a floor
+(800,000 B) and no ceiling, so nothing trips.
+
+**Not measured:** a save straight after an op-log resume (the rebuild's cold
+cost) on a big photo, and memory after a v7 restore of a multi-layer document.
+Both are bounded by the 512 MB budget, but neither number exists yet.
 
 ## Consequences
 

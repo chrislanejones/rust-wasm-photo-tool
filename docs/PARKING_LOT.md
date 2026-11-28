@@ -73,7 +73,7 @@ Left open, each its own change:
 
 | What | Why it's left |
 |---|---|
-| The archive's undo steps (`SnapEntry`) store texts and no shapes, and restored texts get fresh ids | Any resume that falls back to the archive loses shapes from undo. This bug was one way in; the gap is a persistence change (`dexie-migration` rules apply to the archive record too). `e2e/text-placement-undo.spec.ts` case 4 is already a `test.fixme` for exactly this |
+| ~~The archive's undo steps (`SnapEntry`) store texts and no shapes, and restored texts get fresh ids~~ **FIXED 11-28-2026** (`feat/243-archive-keeps-shapes`, ADR-112): each step keeps its layer stack (archive v7, capture v3), text ids are kept on a v7 restore; case 4 is a `test` now | Any resume that falls back to the archive loses shapes from undo. This bug was one way in; the gap is a persistence change (`dexie-migration` rules apply to the archive record too). `e2e/text-placement-undo.spec.ts` case 4 is already a `test.fixme` for exactly this |
 | The follow can still write after a key press that lands between its reads' reply and its write | With one consistent read it writes only when a label really moved; not seen in 400 runs |
 | `usePinSteps`' pin-follow pairs React's shape list with an engine text read | Its "the leader moved itself → skip" rule kept it out of every run; same shape of risk |
 
@@ -171,7 +171,7 @@ The day log listed these as "for PARKING_LOT, each needs your call" and never fi
 
 | What | Why it's left |
 |---|---|
-| Restored texts get fresh ids, and a history snapshot's copy a different one | Was already so; nothing found that keys on a text's id across a reload |
+| ~~Restored texts get fresh ids, and a history snapshot's copy a different one~~ **FIXED 11-28-2026** (`feat/243-archive-keeps-shapes`, ADR-112): a v7 restore gives every text its saved id (`set_text_restore_id`); older records still get fresh ids | Was already so; nothing found that keys on a text's id across a reload |
 
 ## OPEN — MCP needs an attended check before it's switched on (#452, #453, #454, 11-09-2026)
 
@@ -186,7 +186,7 @@ The day log listed these as "for PARKING_LOT, each needs your call" and never fi
 
 | What | Why it's left |
 | --- | --- |
-| After an op-log resume, the next archive the photo writes has no undo history, so an archive resume (log retired) comes back with undo 0. Pixels and texts are right | The same on v9.55 (e2e/archive/qc-1113.spec.ts Q2d/Q2e), so it isn't new. Fixing it means the archive carrying history only the op log holds, which goes through `dexie-migration` |
+| ~~After an op-log resume, the next archive the photo writes has no undo history, so an archive resume (log retired) comes back with undo 0. Pixels and texts are right~~ **FIXED 11-28-2026** (`feat/243-archive-keeps-shapes`, ADR-112 §2): `capture_state` rebuilds the older steps from the log at write time, inside the undo budget; `e2e/text-placement-undo.spec.ts` case 6 | The same on v9.55 (e2e/archive/qc-1113.spec.ts Q2d/Q2e), so it isn't new. Fixing it means the archive carrying history only the op log holds, which goes through `dexie-migration` |
 | ~~Masonry draws the open photo inset in its tile; the others fill theirs~~ | **FIXED 11-17-2026 (#486, `8c89a7c6`)**: the open tile fills like the others (inset 48 px → 0, `e2e/batch-masonry-open-tile.spec.ts`) |
 | ~~An in-page `#marketing` link on `/design-system` switches the tab but keeps the scroll~~ | **FIXED 11-17-2026 (#486, `8c89a7c6`)**: each tab's section bar carries the id and scrolls in (`marketing/e2e/design-system.spec.ts`) |
 

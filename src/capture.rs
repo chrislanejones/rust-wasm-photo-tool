@@ -52,7 +52,17 @@ use wasm_bindgen::prelude::*;
 /// "IHCS" — Image Horse Capture State. Distinct from the archive's "IHST" so a
 /// transport blob can never be mistaken for something persistable.
 const CAPTURE_MAGIC: u32 = 0x49_48_43_53;
-const CAPTURE_VERSION: u32 = 2;
+/// v3 (ADR-112) appends the STEP trailer: each undo/redo step's layer stack.
+const CAPTURE_VERSION: u32 = 3;
+
+/// A step layer's `png_ref` meaning "this step's own composite PNG": the
+/// layer is the step's only visible layer and draws nothing over its pixels,
+/// so the composite IS its pixels and they are not sent twice.
+const SAME_AS_COMPOSITE: u32 = u32::MAX;
+/// STEP pool entry kinds: the PNG's bytes follow, or "the live layer at this
+/// index" (the same pixels the frame already carried above).
+const POOL_BYTES: u32 = 0;
+const POOL_LIVE_LAYER: u32 = 1;
 
 /// Little-endian writer. Mirrors the conventions the JS archive already uses
 /// (u32 lengths, length-prefixed blobs) so the decoder on the other side reads
@@ -72,6 +82,9 @@ impl Frame {
     }
     fn str(&mut self, s: &str) {
         self.bytes(s.as_bytes());
+    }
+    fn f64(&mut self, v: f64) {
+        self.0.extend_from_slice(&v.to_le_bytes());
     }
 }
 
@@ -113,7 +126,18 @@ impl ImageHorseTool {
     ///   layer_count(4) { png, text_json, shape_json } × N
     ///   active_layer_id(4)
     ///   export_quality(4) undo_qualities(4 × N) redo_qualities(4 × N)
+    ///   -- v3 (ADR-112), the STEP trailer:
+    ///   pool_count(4) { kind(4) (png | live_layer_index(4)) } × P
+    ///   for each undo step, then each redo step:
+    ///     layer_count(4) { id(4) name visible(4) opacity(f64) png_ref(4)
+    ///                      text_json shape_json } × n
+    ///     active_layer_id(4)
     /// ```
+    ///
+    /// The undo list starts with any steps REBUILT FROM THE OP LOG: after an
+    /// op-log resume the snapshot stacks are empty on purpose and the log holds
+    /// the history, so without them the next save would write no undo at all
+    /// (ADR-112 §2, `log_steps`).
     ///
     /// Every field is read through the same getter the JS used to call, so this
     /// is an aggregation and not a reimplementation — there is no second
@@ -135,10 +159,24 @@ impl ImageHorseTool {
         };
         f.bytes(kept.png(&mut pngs, None, &composite));
 
+        // Steps the op log holds and the snapshot stacks don't (an op-log
+        // resume), rebuilt once and cached. Empty in every other session.
+        let (log_undo, log_redo) = self.log_steps();
+        let log_steps = self.log_steps.borrow();
+        let (log_undo, log_redo) = (
+            &log_steps[..log_undo],
+            &log_steps[log_undo..log_undo + log_redo],
+        );
+
         // Snapshot PNGs come from each snapshot's cache, so a save encodes only
         // the snapshots taken since the last one, not the whole stack again.
         let undo = self.undo_snapshot_count();
-        f.u32(undo as u32);
+        f.u32((log_undo.len() + undo) as u32);
+        for step in log_undo {
+            f.str(&step.label);
+            f.bytes(&step.composite_png);
+            f.str(&step.texts_json);
+        }
         for (i, snap) in self.hist.undo_stack.iter().enumerate() {
             f.str(&self.get_undo_snapshot_label(i));
             f.bytes(snap.encoded_png());
@@ -146,7 +184,12 @@ impl ImageHorseTool {
         }
 
         let redo = self.redo_snapshot_count();
-        f.u32(redo as u32);
+        f.u32((log_redo.len() + redo) as u32);
+        for step in log_redo {
+            f.str(&step.label);
+            f.bytes(&step.composite_png);
+            f.str(&step.texts_json);
+        }
         for (i, snap) in self.hist.redo_stack.iter().enumerate() {
             f.str(&self.get_redo_snapshot_label(i));
             f.bytes(snap.encoded_png());
@@ -160,23 +203,489 @@ impl ImageHorseTool {
         f.str(&layers_json);
         let layer_count = self.layer_count();
         f.u32(layer_count as u32);
+        let mut live_prints = Vec::with_capacity(layer_count);
         for (i, layer) in self.layers.iter().enumerate().take(layer_count) {
             f.bytes(kept.png(&mut pngs, Some(layer.id), &layer.buf));
+            live_prints.push(kept.0[kept.0.len() - 1].1);
             f.str(&self.get_layer_text_annotations(i));
             f.str(&self.get_layer_shape_annotations(i));
         }
 
         f.u32(self.active_layer_id());
         f.u32(self.export_quality() as u32);
+        for _ in log_undo {
+            f.u32(self.export_quality() as u32);
+        }
         for snapshot in &self.hist.undo_stack {
             f.u32(snapshot.export_quality as u32);
+        }
+        for _ in log_redo {
+            f.u32(self.export_quality() as u32);
         }
         for snapshot in &self.hist.redo_stack {
             f.u32(snapshot.export_quality as u32);
         }
         // Only what this save used survives, so a deleted layer's PNG goes too.
         *pngs = kept;
+        drop(pngs);
+
+        // ── v3: the STEP trailer (ADR-112) ──────────────────────────────────
+        let mut step_pngs = self.step_pngs.borrow_mut();
+        let mut pool = StepPool::new(std::mem::take(&mut *step_pngs), &live_prints);
+        let mut records: Vec<(Vec<StepLayerRecord>, u32)> = Vec::new();
+        for step in log_undo {
+            records.push(pool.log_step(step));
+        }
+        for snap in &self.hist.undo_stack {
+            records.push(pool.snapshot(snap));
+        }
+        for step in log_redo {
+            records.push(pool.log_step(step));
+        }
+        for snap in &self.hist.redo_stack {
+            records.push(pool.snapshot(snap));
+        }
+        f.u32(pool.entries.len() as u32);
+        for entry in &pool.entries {
+            match *entry {
+                PoolEntry::Kept(i) => {
+                    f.u32(POOL_BYTES);
+                    f.bytes(&pool.kept.0[i].1);
+                }
+                PoolEntry::Live(i) => {
+                    f.u32(POOL_LIVE_LAYER);
+                    f.u32(i as u32);
+                }
+            }
+        }
+        for (layers, active_id) in &records {
+            f.u32(layers.len() as u32);
+            for l in layers {
+                f.u32(l.id);
+                f.str(&l.name);
+                f.u32(l.visible as u32);
+                f.f64(l.opacity);
+                f.u32(l.png_ref);
+                f.str(&l.texts_json);
+                f.str(&l.shapes_json);
+            }
+            f.u32(*active_id);
+        }
+        // As with `SavePngs`: only the PNGs this save used are kept.
+        *step_pngs = pool.kept;
         f.0
+    }
+}
+
+/// The undo steps' layer PNGs, by pixel print (ADR-112). Kept between saves,
+/// pruned to what the last save used — `SavePngs`' rule.
+#[derive(Default)]
+pub(crate) struct StepPngs(Vec<(PixelPrint, Vec<u8>)>);
+
+impl StepPngs {
+    fn find(&self, print: &PixelPrint) -> Option<usize> {
+        self.0.iter().position(|(p, _)| p == print)
+    }
+}
+
+/// One undo step the op log held and the snapshot stacks didn't, rebuilt by
+/// `log_steps`. Everything the frame needs, already serialized; its layer
+/// PNGs live in `StepPngs` under each layer's print.
+// Only `refresh_log_steps` (a `tiles` build) reads the cache keys.
+#[cfg_attr(not(feature = "tiles"), allow(dead_code))]
+pub(crate) struct LogStep {
+    log: u64,
+    generation: u64,
+    pos: usize,
+    redo: bool,
+    label: String,
+    composite_png: Vec<u8>,
+    texts_json: String,
+    layers: Vec<StepLayerRecord>,
+    prints: Vec<PixelPrint>,
+    active_id: u32,
+}
+
+/// One layer of one step, as the STEP trailer writes it.
+#[derive(Clone)]
+pub(crate) struct StepLayerRecord {
+    id: u32,
+    name: String,
+    visible: bool,
+    opacity: f64,
+    png_ref: u32,
+    texts_json: String,
+    shapes_json: String,
+}
+
+enum PoolEntry {
+    /// Index into `StepPool::kept`.
+    Kept(usize),
+    /// Index into the live layer stack.
+    Live(usize),
+}
+
+/// Builds one save's STEP pool: each distinct layer PNG once.
+struct StepPool<'a> {
+    prev: StepPngs,
+    kept: StepPngs,
+    live: &'a [PixelPrint],
+    entries: Vec<PoolEntry>,
+    /// The print of each `entries` slot, for the dedup.
+    at: Vec<PixelPrint>,
+}
+
+impl<'a> StepPool<'a> {
+    fn new(prev: StepPngs, live: &'a [PixelPrint]) -> Self {
+        StepPool {
+            prev,
+            kept: StepPngs::default(),
+            live,
+            entries: Vec::new(),
+            at: Vec::new(),
+        }
+    }
+
+    /// The pool slot for these pixels: reused when already pooled this save,
+    /// "the live layer" when the live stack has them, else their PNG (moved
+    /// over from the last save, or `encode`d now).
+    fn slot(&mut self, print: PixelPrint, encode: impl FnOnce() -> Vec<u8>) -> u32 {
+        if let Some(i) = self.at.iter().position(|p| *p == print) {
+            return i as u32;
+        }
+        let entry = match self.live.iter().position(|p| *p == print) {
+            Some(i) => PoolEntry::Live(i),
+            None => {
+                let png = match self.kept.find(&print) {
+                    Some(i) => self.kept.0[i].1.clone(),
+                    None => match self.prev.find(&print) {
+                        Some(i) => self.prev.0.swap_remove(i).1,
+                        None => encode(),
+                    },
+                };
+                self.kept.0.push((print, png));
+                PoolEntry::Kept(self.kept.0.len() - 1)
+            }
+        };
+        self.entries.push(entry);
+        self.at.push(print);
+        (self.entries.len() - 1) as u32
+    }
+
+    fn snapshot(&mut self, snap: &crate::history::Snapshot) -> (Vec<StepLayerRecord>, u32) {
+        let prints = snap.layer_prints();
+        let mut out = Vec::with_capacity(snap.layers.len());
+        for (i, layer) in snap.layers.iter().enumerate() {
+            let png_ref = if composite_is_layer(&snap.layers, i, snap.width, snap.height) {
+                SAME_AS_COMPOSITE
+            } else {
+                self.slot(prints[i], || crate::codec::export_png_fast(&layer.buf))
+            };
+            out.push(StepLayerRecord {
+                id: layer.id,
+                name: layer.name.clone(),
+                visible: layer.visible,
+                opacity: layer.opacity,
+                png_ref,
+                texts_json: crate::annotations::annotations_to_json(&layer.text_annotations),
+                shapes_json: crate::annotations::shapes_to_json(&layer.shape_annotations),
+            });
+        }
+        let active_id = snap.layers.get(snap.active).map_or(0, |l| l.id);
+        (out, active_id)
+    }
+
+    fn log_step(&mut self, step: &LogStep) -> (Vec<StepLayerRecord>, u32) {
+        let mut out = step.layers.clone();
+        for (l, print) in out.iter_mut().zip(&step.prints) {
+            if l.png_ref != SAME_AS_COMPOSITE {
+                // `log_steps` put this PNG in `StepPngs` when it built the
+                // step and checks it is still there before reusing one.
+                l.png_ref = self.slot(*print, Vec::new);
+            }
+        }
+        (out, step.active_id)
+    }
+}
+
+/// Whether the composite of `layers` is exactly `layers[i]`'s pixels: the
+/// single-visible-layer fast path of `composite_layers_into`, the same test.
+fn composite_is_layer(layers: &[crate::layer::Layer], i: usize, w: u32, h: u32) -> bool {
+    let mut visible = layers.iter().enumerate().filter(|(_, l)| l.visible);
+    let (Some((only, l)), None) = (visible.next(), visible.next()) else {
+        return false;
+    };
+    only == i
+        && l.opacity >= 0.999
+        && l.mask.is_none()
+        && l.overlay.is_none()
+        && crate::layer::layer_has_no_overlays(l)
+        && l.buf.data.len() == (w as usize) * (h as usize) * 4
+}
+
+impl ImageHorseTool {
+    /// Bring `self.log_steps` up to date for this save and return how many of
+    /// its entries are undo steps and how many redo steps (undo first, oldest
+    /// first; redo in the redo stack's order, farthest first). ADR-112 §2.
+    ///
+    /// Only when the op log is the source of history (in scope, not broken,
+    /// op-log undo on) and holds gestures the snapshot stacks don't: after an
+    /// op-log resume the stacks are empty and the log has everything. In a
+    /// session that never resumed, the oldest snapshot is the log's start and
+    /// this adds nothing.
+    ///
+    /// The steps share the undo budget (`max_bytes`, `max_history`) with the
+    /// snapshots already held, counted as `Snapshot::bytes` counts them;
+    /// newest kept, oldest dropped first.
+    fn log_steps(&self) -> (usize, usize) {
+        #[cfg(feature = "tiles")]
+        {
+            let wanted = self.log_step_positions();
+            self.refresh_log_steps(&wanted);
+            let undo = wanted.iter().filter(|(_, _, redo)| !redo).count();
+            (undo, wanted.len() - undo)
+        }
+        #[cfg(not(feature = "tiles"))]
+        {
+            (0, 0)
+        }
+    }
+
+    /// The (op position, label, is_redo) of each step `log_steps` should hold,
+    /// in frame order.
+    #[cfg(feature = "tiles")]
+    fn log_step_positions(&self) -> Vec<(usize, &'static str, bool)> {
+        let mut out = Vec::new();
+        if !self.oplog_use_for_undo || self.oplog_broken || self.content_idx() != Some(self.active)
+        {
+            return out;
+        }
+        let Some(log) = self.oplog.as_ref() else {
+            return out;
+        };
+        // Where the snapshots' own history starts. A snapshot that can't say
+        // (`None`: injected by a restore) means the snapshots are the history.
+        let c0 = match self.hist.undo_stack.front() {
+            None => log.cursor(),
+            Some(s) => match s.oplog_cursor {
+                Some(c) => c,
+                None => return out,
+            },
+        };
+        let mut gestures = Vec::new();
+        let mut start = 0;
+        for (end, label) in log.gesture_labels() {
+            gestures.push((start, end, label));
+            start = end;
+        }
+        let layers = if self.canvas_idx().is_some() { 2 } else { 1 };
+        let per = (self.width as usize) * (self.height as usize) * 4 * layers;
+        let held: usize = self
+            .hist
+            .undo_stack
+            .iter()
+            .map(|s| s.bytes())
+            .sum::<usize>()
+            + self
+                .hist
+                .redo_stack
+                .iter()
+                .map(|s| s.bytes())
+                .sum::<usize>();
+        let mut room = self.hist.max_bytes.saturating_sub(held);
+        let mut steps_left = self
+            .hist
+            .max_history
+            .saturating_sub(self.hist.undo_stack.len());
+        // Undo: the state BEFORE each gesture that ends at or before c0,
+        // newest first while it fits. The trim keeps at least one step, so do
+        // the same when nothing else is held.
+        for &(start, end, label) in gestures.iter().rev() {
+            if end > c0 {
+                continue;
+            }
+            let first = out.is_empty() && self.hist.undo_stack.is_empty();
+            if steps_left == 0 || (per > room && !first) {
+                break;
+            }
+            out.push((start, label, false));
+            room = room.saturating_sub(per);
+            steps_left -= 1;
+        }
+        out.reverse();
+        // Redo: the state AFTER each gesture past the cursor, when the redo
+        // stack doesn't already hold them. Nearest first while it fits; the
+        // redo stack's order is farthest first, so reversed after.
+        if self.hist.redo_stack.is_empty() {
+            let cursor = log.cursor();
+            let mut redo = Vec::new();
+            for &(start, end, label) in &gestures {
+                if start < cursor {
+                    continue;
+                }
+                if per > room {
+                    break;
+                }
+                redo.push((end, label, true));
+                room = room.saturating_sub(per);
+            }
+            redo.reverse();
+            out.extend(redo);
+        }
+        out
+    }
+
+    /// Make `self.log_steps` hold exactly `wanted`, rebuilding (in one pass
+    /// over the log) only the steps the cache doesn't already hold.
+    #[cfg(feature = "tiles")]
+    fn refresh_log_steps(&self, wanted: &[(usize, &'static str, bool)]) {
+        let mut cache = self.log_steps.borrow_mut();
+        let Some(log) = self.oplog.as_ref() else {
+            cache.clear();
+            return;
+        };
+        let (id, generation) = (log.id(), log.generation());
+        let step_pngs = self.step_pngs.borrow();
+        let mut old: Vec<Option<LogStep>> =
+            std::mem::take(&mut *cache).into_iter().map(Some).collect();
+        let mut out: Vec<Option<LogStep>> = Vec::with_capacity(wanted.len());
+        let mut missing: Vec<usize> = Vec::new();
+        for &(pos, _, redo) in wanted {
+            let hit = old.iter().position(|s| {
+                s.as_ref().is_some_and(|s| {
+                    s.log == id
+                        && s.generation == generation
+                        && s.pos == pos
+                        && s.redo == redo
+                        // Its PNGs must still be held, or it can't be written.
+                        && s.layers.iter().zip(&s.prints).all(|(l, p)| {
+                            l.png_ref == SAME_AS_COMPOSITE || step_pngs.find(p).is_some()
+                        })
+                })
+            });
+            match hit.and_then(|i| old[i].take()) {
+                Some(step) => out.push(Some(step)),
+                None => {
+                    out.push(None);
+                    missing.push(pos);
+                }
+            }
+        }
+        drop(step_pngs);
+        if !missing.is_empty() {
+            missing.sort_unstable();
+            missing.dedup();
+            let mut built: Vec<(usize, Vec<crate::layer::Layer>, usize, u32, u32)> = Vec::new();
+            log.for_each_document_at(&missing, |pos, doc| {
+                let (layers, active) = self.layers_from_log_document(doc);
+                built.push((pos, layers, active, doc.width(), doc.height()));
+            });
+            let mut step_pngs = self.step_pngs.borrow_mut();
+            for (slot, &(pos, label, redo)) in out.iter_mut().zip(wanted) {
+                if slot.is_some() {
+                    continue;
+                }
+                let Some((_, layers, active, w, h)) = built.iter().find(|b| b.0 == pos) else {
+                    continue;
+                };
+                let composite = crate::ImageBuffer {
+                    width: *w,
+                    height: *h,
+                    data: crate::layer::composite_layers(layers, *w, *h, None, None),
+                };
+                let mut records = Vec::new();
+                let mut prints = Vec::new();
+                for (i, layer) in layers.iter().enumerate() {
+                    let print = PixelPrint::of(&layer.buf);
+                    let png_ref = if composite_is_layer(layers, i, *w, *h) {
+                        SAME_AS_COMPOSITE
+                    } else {
+                        if step_pngs.find(&print).is_none() {
+                            step_pngs
+                                .0
+                                .push((print, crate::codec::export_png_fast(&layer.buf)));
+                        }
+                        0 // resolved per save by `StepPool::log_step`
+                    };
+                    prints.push(print);
+                    records.push(StepLayerRecord {
+                        id: layer.id,
+                        name: layer.name.clone(),
+                        visible: layer.visible,
+                        opacity: layer.opacity,
+                        png_ref,
+                        texts_json: crate::annotations::annotations_to_json(
+                            &layer.text_annotations,
+                        ),
+                        shapes_json: crate::annotations::shapes_to_json(&layer.shape_annotations),
+                    });
+                }
+                *slot = Some(LogStep {
+                    log: id,
+                    generation,
+                    pos,
+                    redo,
+                    label: label.to_string(),
+                    composite_png: crate::codec::export_png_fast(&composite),
+                    texts_json: crate::annotations::annotations_to_json(
+                        &layers[*active].text_annotations,
+                    ),
+                    layers: records,
+                    prints,
+                    active_id: layers[*active].id,
+                });
+            }
+        }
+        *cache = out.into_iter().flatten().collect();
+    }
+
+    /// The layer stack an op-log `Document` describes, with the live stack's
+    /// layer ids and names: the Canvas (when the document has one) and the
+    /// one content layer, its texts (ids kept) and shapes. Returns the stack
+    /// and the content layer's index.
+    #[cfg(feature = "tiles")]
+    fn layers_from_log_document(
+        &self,
+        doc: &crate::ops::Document,
+    ) -> (Vec<crate::layer::Layer>, usize) {
+        let (w, h) = (doc.width(), doc.height());
+        let mut layers = Vec::with_capacity(2);
+        if let Some(c) = doc.canvas {
+            let id = self
+                .canvas_idx()
+                .and_then(|i| self.layers.get(i))
+                .map_or(0, |l| l.id);
+            let mut canvas = crate::layer::Layer::new_canvas(id, w, h);
+            canvas.visible = c.visible;
+            canvas.opacity = c.opacity;
+            if c.a != 0 {
+                for px in canvas.buf.data.chunks_exact_mut(4) {
+                    px.copy_from_slice(&[c.r, c.g, c.b, c.a]);
+                }
+            }
+            layers.push(canvas);
+        }
+        let live = self.content_idx().and_then(|i| self.layers.get(i));
+        let mut data = vec![0u8; (w as usize) * (h as usize) * 4];
+        doc.pixels.blit_to_flat(&mut data);
+        layers.push(crate::layer::Layer {
+            id: live.map_or(1, |l| l.id),
+            name: live.map_or_else(|| "Background".to_string(), |l| l.name.clone()),
+            kind: crate::layer::LayerKind::Content,
+            visible: live.is_none_or(|l| l.visible),
+            opacity: live.map_or(1.0, |l| l.opacity),
+            buf: crate::ImageBuffer {
+                width: w,
+                height: h,
+                data,
+            },
+            mask: None,
+            overlay: None,
+            text_annotations: doc.texts.iter().map(crate::text_from_params).collect(),
+            shape_annotations: doc.shapes.iter().map(|s| s.to_annotation()).collect(),
+        });
+        let content = layers.len() - 1;
+        (layers, content)
     }
 }
 
@@ -722,7 +1231,7 @@ mod capture_tests {
         let mut r = Read { b: &blob, p: 0 };
 
         assert_eq!(r.u32(), 0x49_48_43_53, "magic");
-        assert_eq!(r.u32(), 2, "version");
+        assert_eq!(r.u32(), 3, "version");
         assert_eq!(r.u32(), t.width(), "canvas width");
         assert_eq!(r.u32(), t.height(), "canvas height");
 
@@ -783,6 +1292,27 @@ mod capture_tests {
         for _ in 0..redo {
             assert_eq!(r.u32(), 63, "redo quality");
         }
+        // v3: the STEP trailer (ADR-112), checked in depth by the tests below.
+        let pool = r.u32();
+        for _ in 0..pool {
+            if r.u32() == super::POOL_BYTES {
+                r.blob();
+            } else {
+                r.u32();
+            }
+        }
+        for _ in 0..undo + redo {
+            for _ in 0..r.u32() {
+                r.u32();
+                r.text();
+                r.u32();
+                r.p += 8;
+                r.u32();
+                r.text();
+                r.text();
+            }
+            r.u32();
+        }
         assert_eq!(
             r.p,
             blob.len(),
@@ -814,6 +1344,380 @@ mod capture_tests {
             first,
             t.capture_state(),
             "the cached save is byte-identical"
+        );
+    }
+
+    // ── v3, the STEP trailer (ADR-112) ──────────────────────────────────
+
+    /// One step layer as the trailer carries it, its PNG already resolved.
+    #[derive(Debug, Clone)]
+    struct StepLayer {
+        id: u32,
+        name: String,
+        visible: bool,
+        opacity: f64,
+        /// The pool slot it named, or `None` for "this step's composite".
+        slot: Option<usize>,
+        png: Vec<u8>,
+        texts: String,
+        shapes: String,
+    }
+
+    /// One undo or redo step out of a v3 frame. Every field is read so the
+    /// frame is walked the way `decodeCapture` walks it, asserted on or not.
+    #[derive(Debug, Clone)]
+    #[allow(dead_code)]
+    struct Step {
+        label: String,
+        composite: Vec<u8>,
+        texts: String,
+        layers: Vec<StepLayer>,
+        active_id: u32,
+    }
+
+    /// The whole frame, read the way `decodeCapture` reads it.
+    struct Frame3 {
+        undo: Vec<Step>,
+        redo: Vec<Step>,
+        live_layer_pngs: Vec<Vec<u8>>,
+        pool: Vec<(u32, Vec<u8>)>,
+    }
+
+    fn read_frame(blob: &[u8]) -> Frame3 {
+        let mut r = Read { b: blob, p: 0 };
+        assert_eq!(r.u32(), 0x49_48_43_53);
+        assert_eq!(r.u32(), 3, "a v3 frame");
+        r.u32();
+        r.u32();
+        r.blob();
+        let mut stacks: Vec<Vec<Step>> = Vec::new();
+        for _ in 0..2 {
+            let mut v = Vec::new();
+            for _ in 0..r.u32() {
+                v.push(Step {
+                    label: r.text(),
+                    composite: r.blob().to_vec(),
+                    texts: r.text(),
+                    layers: Vec::new(),
+                    active_id: 0,
+                });
+            }
+            stacks.push(v);
+        }
+        r.text();
+        r.text();
+        r.text();
+        let mut live_layer_pngs = Vec::new();
+        for _ in 0..r.u32() {
+            live_layer_pngs.push(r.blob().to_vec());
+            r.text();
+            r.text();
+        }
+        r.u32();
+        r.u32();
+        let steps = stacks[0].len() + stacks[1].len();
+        r.p += 4 * steps;
+        let mut pool = Vec::new();
+        for _ in 0..r.u32() {
+            let kind = r.u32();
+            if kind == super::POOL_BYTES {
+                pool.push((kind, r.blob().to_vec()));
+            } else {
+                let i = r.u32() as usize;
+                pool.push((kind, live_layer_pngs[i].clone()));
+            }
+        }
+        for step in stacks.iter_mut().flatten() {
+            for _ in 0..r.u32() {
+                let id = r.u32();
+                let name = r.text();
+                let visible = r.u32() != 0;
+                let opacity = f64::from_le_bytes(r.b[r.p..r.p + 8].try_into().unwrap()); // allow: rust-panic
+                r.p += 8;
+                let png_ref = r.u32();
+                let (slot, png) = if png_ref == super::SAME_AS_COMPOSITE {
+                    (None, step.composite.clone())
+                } else {
+                    (Some(png_ref as usize), pool[png_ref as usize].1.clone())
+                };
+                step.layers.push(StepLayer {
+                    id,
+                    name,
+                    visible,
+                    opacity,
+                    slot,
+                    png,
+                    texts: r.text(),
+                    shapes: r.text(),
+                });
+            }
+            step.active_id = r.u32();
+        }
+        assert_eq!(r.p, blob.len(), "v3 frame fully consumed");
+        let redo = stacks.pop().unwrap(); // allow: rust-panic
+        let undo = stacks.pop().unwrap(); // allow: rust-panic
+        Frame3 {
+            undo,
+            redo,
+            live_layer_pngs,
+            pool,
+        }
+    }
+
+    fn rgba(png: &[u8]) -> Vec<u8> {
+        crate::codec::decode_png(png).unwrap().0 // allow: rust-panic
+    }
+
+    /// Red on master (v2 has no step layers): each step carries its shapes,
+    /// its texts with their ids, and its RAW pixels, not the composite.
+    #[test]
+    fn capture_v3_steps_keep_their_shapes_texts_and_raw_pixels() {
+        let mut t = ImageHorseTool::new(40, 30);
+        t.load_image(&solid(40, 30, [10, 20, 30, 255]));
+        t.add_shape_annotation(
+            0, 2.0, 2.0, 12.0, 12.0, "#ff0000", 2.0, 0, 1, "#ff0000", "#ff0000", 0, 0, 0,
+        );
+        let text = t.add_text_annotation(
+            "Hi", 12.0, 0, 0, 0, true, 3, 3, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, "",
+        );
+        t.add_shape_annotation(
+            1, 20.0, 5.0, 30.0, 15.0, "#00ff00", 2.0, 0, 1, "#00ff00", "#00ff00", 0, 0, 0,
+        );
+        // Undo stack now: [empty, rect, rect+text]; live: rect+text+circle.
+        let f = read_frame(&t.capture_state());
+        assert_eq!(f.undo.len(), t.undo_snapshot_count());
+        let last = f.undo.last().unwrap(); // allow: rust-panic
+        assert_eq!(last.layers.len(), 1);
+        let l = &last.layers[0];
+        assert_eq!(
+            l.shapes,
+            t.hist
+                .undo_stack
+                .back()
+                .map(|s| crate::annotations::shapes_to_json(&s.layers[0].shape_annotations))
+                .unwrap()
+        ); // allow: rust-panic
+        assert!(
+            l.shapes.contains("\"kind\":0"),
+            "the rect is in the step: {}",
+            l.shapes
+        );
+        assert!(
+            l.texts.contains(&format!("\"id\":{text}")),
+            "the text keeps its id: {}",
+            l.texts
+        );
+        assert_eq!(
+            (l.id, l.name.as_str(), l.visible, l.opacity),
+            (1, "Background", true, 1.0)
+        );
+        assert_eq!(last.active_id, 1);
+        // Raw pixels: the photo with NO shape or text ink, unlike the composite.
+        assert_eq!(
+            rgba(&l.png),
+            solid(40, 30, [10, 20, 30, 255]),
+            "the layer's own pixels"
+        );
+        assert_ne!(
+            rgba(&last.composite),
+            rgba(&l.png),
+            "the composite has the ink"
+        );
+        // The first step (no overlays) is its own composite: not sent twice.
+        assert!(
+            f.undo[0].layers[0].slot.is_none(),
+            "no overlays: the composite stands in"
+        );
+    }
+
+    /// The same pixels are sent once however many steps hold them, and pixels
+    /// the live stack already carries are named, not copied.
+    #[test]
+    fn capture_v3_pools_step_pixels() {
+        let mut t = ImageHorseTool::new(40, 30);
+        t.load_image(&solid(40, 30, [10, 20, 30, 255]));
+        for i in 0..4 {
+            let x = 2.0 + 8.0 * i as f64;
+            t.add_shape_annotation(
+                0,
+                x,
+                2.0,
+                x + 6.0,
+                8.0,
+                "#ff0000",
+                2.0,
+                0,
+                1,
+                "#ff0000",
+                "#ff0000",
+                0,
+                0,
+                0,
+            );
+        }
+        let f = read_frame(&t.capture_state());
+        let slots: Vec<_> = f.undo.iter().skip(1).map(|s| s.layers[0].slot).collect();
+        assert!(
+            slots.iter().all(|s| *s == slots[0] && s.is_some()),
+            "one slot for 3 steps: {slots:?}"
+        );
+        assert_eq!(f.pool.len(), 1);
+        assert_eq!(
+            f.pool[0].0,
+            super::POOL_LIVE_LAYER,
+            "the live layer has these pixels already"
+        );
+        assert_eq!(rgba(&f.pool[0].1), rgba(&f.live_layer_pngs[0]));
+
+        // Pixels the live stack no longer has go as bytes, and a second save
+        // that changed nothing writes the identical frame from the kept PNGs.
+        // A left-to-right ramp, so the flip below really changes the pixels.
+        let mut ramp = solid(40, 30, [10, 20, 30, 255]);
+        for (i, p) in ramp.chunks_exact_mut(4).enumerate() {
+            p[0] = ((i % 40) * 6) as u8;
+        }
+        let mut t = ImageHorseTool::new(40, 30);
+        t.load_image(&ramp);
+        t.add_shape_annotation(
+            0, 2.0, 2.0, 8.0, 8.0, "#ff0000", 2.0, 0, 1, "#ff0000", "#ff0000", 0, 0, 0,
+        );
+        t.add_shape_annotation(
+            0, 12.0, 2.0, 18.0, 8.0, "#ff0000", 2.0, 0, 1, "#ff0000", "#ff0000", 0, 0, 0,
+        );
+        t.flip_horizontal();
+        let f = read_frame(&t.capture_state());
+        assert_eq!(
+            f.pool.len(),
+            1,
+            "both shape steps hold the unflipped pixels: one PNG"
+        );
+        assert_eq!(
+            f.pool[0].0,
+            super::POOL_BYTES,
+            "the live layer is flipped now, so the bytes go"
+        );
+        assert_eq!(rgba(&f.pool[0].1), ramp);
+        let first = t.capture_state();
+        assert_eq!(
+            first,
+            t.capture_state(),
+            "a second save reuses every step PNG"
+        );
+    }
+
+    /// The tool state after an op-log RESUME, made without the round trip:
+    /// the edits are recorded in the log, then the snapshot stacks are emptied
+    /// exactly as `oplog_restore` empties them.
+    #[cfg(feature = "tiles")]
+    fn resumed(w: u32, h: u32) -> (ImageHorseTool, Frame3) {
+        let mut t = ImageHorseTool::new(w, h);
+        let mut px = solid(w, h, [200, 180, 160, 255]);
+        for (i, p) in px.chunks_exact_mut(4).enumerate() {
+            p[0] = (i % 251) as u8;
+        }
+        t.load_image(&px);
+        t.set_oplog_undo(true);
+        t.add_shape_annotation(
+            0, 4.0, 4.0, 20.0, 20.0, "#ff0000", 2.0, 0, 1, "#ff0000", "#ff0000", 0, 0, 0,
+        );
+        t.recomposite();
+        t.add_text_annotation(
+            "Crack", 12.0, 0, 0, 0, true, 30, 6, 0.0, 0, 0, 0, 0, 0, 0, 0, 0, "",
+        );
+        t.recomposite();
+        t.paint_down(5.0, 30.0, 6.0, "#0000ff", 1.0, 0.9, "off");
+        t.paint_move(40.0, 30.0);
+        t.paint_up();
+        t.recomposite();
+        t.add_shape_annotation(
+            4, 30.0, 20.0, 50.0, 35.0, "#00ff00", 3.0, 1, 1, "#00ff00", "#00ff00", 0, 0, 0,
+        );
+        t.recomposite();
+        assert!(!t.oplog_is_broken(), "every edit was recorded");
+        assert_eq!(t.undo_snapshot_count(), 4);
+        let before = read_frame(&t.capture_state());
+        t.hist.clear();
+        (t, before)
+    }
+
+    /// Red on master: after an op-log resume the next save wrote no undo at
+    /// all (qc-1113 Q2d/Q2e). Rebuilt from the log, the steps are the ones
+    /// the snapshots held before the resume: same pixels, same objects.
+    #[cfg(feature = "tiles")]
+    #[test]
+    fn capture_after_an_oplog_resume_rebuilds_the_undo_steps_from_the_log() {
+        let (t, before) = resumed(64, 48);
+        assert_eq!(t.undo_snapshot_count(), 0, "resumed: the stacks are empty");
+        assert_eq!(t.undo_count(), 4, "and the log has the history");
+        let after = read_frame(&t.capture_state());
+        assert_eq!(after.undo.len(), 4, "the save carries the log's four steps");
+        for (i, (a, b)) in after.undo.iter().zip(&before.undo).enumerate() {
+            assert_eq!(
+                rgba(&a.composite),
+                rgba(&b.composite),
+                "step {i}: same picture"
+            );
+            assert_eq!(a.layers.len(), b.layers.len(), "step {i}: layer count");
+            for (la, lb) in a.layers.iter().zip(&b.layers) {
+                assert_eq!(la.shapes, lb.shapes, "step {i}: same shapes");
+                assert_eq!(la.texts, lb.texts, "step {i}: same texts, same ids");
+                assert_eq!(rgba(&la.png), rgba(&lb.png), "step {i}: same raw pixels");
+                assert_eq!((la.id, &la.name), (lb.id, &lb.name), "step {i}: same layer");
+            }
+        }
+        assert!(after.redo.is_empty());
+    }
+
+    /// After a resume with the cursor rewound, the redo past it is rebuilt too,
+    /// in the redo stack's order (farthest first).
+    #[cfg(feature = "tiles")]
+    #[test]
+    fn capture_after_an_oplog_resume_rebuilds_redo_past_the_cursor() {
+        let (mut t, before) = resumed(64, 48);
+        assert!(t.undo() && t.undo(), "two undos walk the log");
+        let f = read_frame(&t.capture_state());
+        assert_eq!((f.undo.len(), f.redo.len()), (2, 2));
+        // redo[1] is the next redo: the state after gesture 3, which is the
+        // state before gesture 4 — undo step 3 of the un-rewound save.
+        assert_eq!(rgba(&f.redo[1].composite), rgba(&before.undo[3].composite));
+        assert_eq!(f.redo[1].layers[0].shapes, before.undo[3].layers[0].shapes);
+    }
+
+    /// The rebuilt steps share the undo budget: with room for two, the two
+    /// NEWEST are kept and the oldest go first.
+    #[cfg(feature = "tiles")]
+    #[test]
+    fn rebuilt_steps_respect_the_undo_budget_oldest_first_out() {
+        let (mut t, before) = resumed(64, 48);
+        t.hist.max_bytes = 64 * 48 * 4 * 2;
+        let f = read_frame(&t.capture_state());
+        assert_eq!(f.undo.len(), 2, "two steps fit");
+        assert_eq!(
+            rgba(&f.undo[0].composite),
+            rgba(&before.undo[2].composite),
+            "the oldest went"
+        );
+        assert_eq!(rgba(&f.undo[1].composite), rgba(&before.undo[3].composite));
+        // And the step cap.
+        t.hist.max_bytes = usize::MAX;
+        t.hist.max_history = 3;
+        assert_eq!(read_frame(&t.capture_state()).undo.len(), 3);
+    }
+
+    /// A rebuilt step is built once: the second save after a resume writes
+    /// the identical frame from the cache.
+    #[cfg(feature = "tiles")]
+    #[test]
+    fn rebuilt_steps_are_cached_between_saves() {
+        let (t, _) = resumed(64, 48);
+        let first = t.capture_state();
+        assert_eq!(t.log_steps.borrow().len(), 4);
+        let ptr = t.log_steps.borrow()[0].composite_png.as_ptr();
+        assert_eq!(first, t.capture_state());
+        assert_eq!(
+            t.log_steps.borrow()[0].composite_png.as_ptr(),
+            ptr,
+            "not rebuilt"
         );
     }
 
@@ -1411,6 +2315,9 @@ mod capture_tests {
         for _ in 0..u + d {
             assert_eq!(r.u32(), 75, "empty-document snapshot quality");
         }
+        // v3's STEP trailer (ADR-112): an empty pool, and no steps.
+        assert_eq!(u + d, 0, "an empty document has no history");
+        assert_eq!(r.u32(), 0, "empty-document STEP pool");
         assert_eq!(r.p, blob.len(), "empty-document frame must parse cleanly");
     }
 

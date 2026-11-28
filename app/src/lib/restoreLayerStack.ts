@@ -21,7 +21,7 @@
 // `decodeToRgba`) and this module should not become the fourth, nor force an
 // import direction between lib/ and hooks/.
 import type { ImageHorseTool } from "stamp_tool";
-import type { PersistedAnnotation, PersistedLayer } from "@/lib/editPersistence";
+import type { PersistedAnnotation, PersistedLayer, SavedEdit, SnapEntry } from "@/lib/editPersistence";
 import { ensureEngineFontsForRestore } from "@/lib/engineFonts";
 
 /** Decode a PNG to raw RGBA. Signature matches the existing local helpers. */
@@ -51,6 +51,10 @@ export async function restoreLayerStack(
   layers: PersistedLayer[] | undefined,
   activeLayerId: number | undefined,
   decodePng: PngDecoder,
+  /** ADR-112, the v7 restore: `keepHistory` rebuilds the stack without
+   *  clearing the steps already stashed (`begin_layer_restore_keep_history`),
+   *  `keepTextIds` gives each text its saved id back. Both off = today. */
+  opts: { keepHistory?: boolean; keepTextIds?: boolean } = {},
 ): Promise<boolean> {
   if (!layers || layers.length === 0) return false;
 
@@ -65,7 +69,8 @@ export async function restoreLayerStack(
     await ensureEngineFontsForRestore(tool);
   }
 
-  tool.begin_layer_restore();
+  if (opts.keepHistory) tool.begin_layer_restore_keep_history();
+  else tool.begin_layer_restore();
   for (const layer of layers) {
     const { rgba, w, h } = await decodePng(layer.png);
     tool.push_restored_layer(
@@ -77,7 +82,7 @@ export async function restoreLayerStack(
       layer.opacity,
     );
     for (const a of layer.annotations ?? []) {
-      restoreStoredText(tool, a);
+      restoreStoredText(tool, a, { keepId: opts.keepTextIds });
     }
     for (const s of layer.shapes ?? []) {
       if (s.kind === 5) {
@@ -135,9 +140,13 @@ export async function restoreLayerStack(
  *  first undo after an archive resume put a wrapped text back on one line.
  *  A field added below now reaches every path at once. */
 export function restoreStoredText(
-  tool: Pick<ImageHorseTool, "restore_text_annotation">,
+  tool: Pick<ImageHorseTool, "restore_text_annotation"> & Partial<Pick<ImageHorseTool, "set_text_restore_id">>,
   a: PersistedAnnotation,
+  /** ADR-112: give the text its saved id back (a v7 restore). Off = a fresh
+   *  id, today's behavior, which every older record keeps. */
+  opts: { keepId?: boolean } = {},
 ): void {
+  if (opts.keepId && a.id > 0) tool.set_text_restore_id?.(a.id);
   tool.restore_text_annotation(
     a.text,
     a.font_size,
@@ -203,4 +212,53 @@ export function restoreStoredText(
     a.border_b ?? 0,
     a.border_a ?? 0,
   );
+}
+
+/** Whether `saved` takes the v7 restore (ADR-112): it was written with step
+ *  layers in mind and has a live layer stack to build last. Anything else
+ *  takes today's path, unchanged. */
+export function isV7Saved(saved: SavedEdit): boolean {
+  return saved.archiveVersion === 7 && (saved.layers?.length ?? 0) > 0;
+}
+
+/**
+ * The v7 history restore (ADR-112): rebuild every saved undo and redo step as
+ * a real document and stash it, oldest first, so an undo after the reload
+ * gives back its shapes, layers and text ids instead of a flattened picture.
+ *
+ * Runs BEFORE the live document is built: each step is built live (keeping
+ * the history so far), then moved into history with `stash_live_as_snapshot`.
+ * The caller then builds the live document with `keepHistory`.
+ *
+ * A step without layers (written before v7 inside a v7 record, which a
+ * reader can't rule out) is injected the old way: one layer from its PNG,
+ * then its texts, so it is no worse than today. The undo stack is trimmed to
+ * the budget as steps go in, so the texts go to the step's real index, not
+ * its position in `saved`.
+ */
+export async function restoreSavedSteps(
+  tool: ImageHorseTool,
+  saved: SavedEdit,
+  decodePng: PngDecoder,
+): Promise<void> {
+  const one = async (snap: SnapEntry, stack: 1 | 2) => {
+    await tool.set_export_quality(snap.exportQuality ?? 75);
+    if (snap.layers && snap.layers.length > 0) {
+      await restoreLayerStack(tool, snap.layers, snap.activeLayerId, decodePng, { keepHistory: true, keepTextIds: true });
+      await tool.stash_live_as_snapshot(stack, snap.label);
+      return;
+    }
+    const { rgba, w, h } = await decodePng(snap.png);
+    const px = new Uint8Array(rgba.buffer as ArrayBuffer);
+    if (stack === 1) tool.inject_undo_snapshot(px, w, h, snap.label);
+    else tool.inject_redo_snapshot(px, w, h, snap.label);
+    if (snap.annotations) {
+      const at = (stack === 1 ? await tool.undo_snapshot_count() : await tool.redo_snapshot_count()) - 1;
+      tool.set_text_restore_target(stack, at);
+      for (const a of snap.annotations) restoreStoredText(tool, a);
+      tool.set_text_restore_target(0, 0);
+    }
+  };
+  for (const snap of saved.undoStack) await one(snap, 1);
+  for (const snap of saved.redoStack) await one(snap, 2);
 }

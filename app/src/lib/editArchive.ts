@@ -4,11 +4,13 @@ import { parseSnapshotAnnotations, parseShapes, type SavedEdit, type SnapEntry, 
 // Packs canvas + full undo/redo history into a single binary blob so one
 // Convex storage upload preserves everything, matching IDB behavior.
 //
-// Format (all little-endian u32):
-//   magic(4) version(4) canvas_w(4) canvas_h(4)
+// Format (all little-endian u32; the full layout is in ADR-112):
+//   magic(4) version(4) [compat(4), v7+] canvas_w(4) canvas_h(4)
 //   canvas_png_len(4) canvas_png(...)
-//   undo_count(4)  { label_len(4) label(...) png_len(4) png(...) } × N
-//   redo_count(4)  { label_len(4) label(...) png_len(4) png(...) } × N
+//   undo_count(4)  { label png annotations_json } × N
+//   redo_count(4)  { label png annotations_json } × N
+//   annotations_json shapes_json  layer stack  active_id  qualities
+//   [v7+] section_count(4) { tag(4) len(4) bytes } × N   -- "STEP": step layers
 
 const MAGIC = 0x49485354; // "IHST"
 /** v3 appends a per-snapshot annotations JSON blob after each PNG so
@@ -19,7 +21,22 @@ const MAGIC = 0x49485354; // "IHST"
  *  survive reload. Older archives are still loadable; missing data (shapes,
  *  layers) comes back empty / collapses to a single layer. */
 // ADR-031: v6 appends current and per-snapshot quality; v1–v5 remain readable.
-const VERSION = 6;
+//
+// ADR-112: v7 puts a `compat` word after the version (the oldest reader that
+// can read this archive), keeps the v6 body byte for byte, and ends with a
+// SECTION TABLE: `count { tag len bytes }`. Its one section, STEP, gives each
+// undo/redo step its own layer stack (pixels, texts with their ids, shapes),
+// in the live layer stack's encoding, with the pixels pooled so a PNG that
+// several steps share is stored once. A reader skips a section it doesn't
+// know; a reader older than `compat` refuses the archive ("newer version").
+const VERSION = 7;
+/** The oldest reader that can read what this writer writes. */
+const COMPAT = 7;
+/** "STEP": per-step layer stacks. */
+const TAG_STEP = 0x50455453;
+/** `png_ref` meaning "this step's own composite PNG" (one layer, no overlays:
+ *  the same pixels, so they are not stored twice). */
+const SAME_AS_COMPOSITE = 0xffffffff;
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
@@ -50,7 +67,7 @@ export function encodeArchive(
   const layerAnnBytes = layers.map((l) => enc.encode(JSON.stringify(l.annotations ?? [])));
   const layerShapeBytes = layers.map((l) => enc.encode(JSON.stringify(l.shapes ?? [])));
 
-  let size = 4 + 4 + 4 + 4 + 4 + canvasPng.length + 4 + 4;
+  let size = 4 + 4 + 4 + 4 + 4 + 4 + canvasPng.length + 4 + 4;
   for (let i = 0; i < undoStack.length; i++) {
     size += 4 + labelBytes(undoStack[i].label).length + 4 + undoStack[i].png.length + 4 + undoAnnBytes[i].length;
   }
@@ -73,6 +90,9 @@ export function encodeArchive(
   size += 4; // active layer id
 
   size += 4 * (1 + undoStack.length + redoStack.length); // v6 qualities
+  const stepSection = encodeStepSection([...undoStack, ...redoStack]);
+  size += 4; // v7 section count
+  if (stepSection) size += 4 + 4 + stepSection.length;
   const buf = new ArrayBuffer(size);
   const view = new DataView(buf);
   const u8 = new Uint8Array(buf);
@@ -84,7 +104,7 @@ export function encodeArchive(
   const wstr = (s: string) => { const b = labelBytes(s); w32(b.length); wb(b); };
   const wbytes = (b: Uint8Array) => { w32(b.length); wb(b); };
 
-  w32(MAGIC); w32(VERSION); w32(canvasW); w32(canvasH);
+  w32(MAGIC); w32(VERSION); w32(COMPAT); w32(canvasW); w32(canvasH);
   w32(canvasPng.length); wb(canvasPng);
 
   w32(undoStack.length);
@@ -120,7 +140,122 @@ export function encodeArchive(
   for (const snapshot of undoStack) w32(snapshot.exportQuality ?? 75);
   for (const snapshot of redoStack) w32(snapshot.exportQuality ?? 75);
 
+  // v7 section table.
+  w32(stepSection ? 1 : 0);
+  if (stepSection) {
+    w32(TAG_STEP);
+    wbytes(stepSection);
+  }
+
   return u8;
+}
+
+/** The STEP section, or null when no step carries layers (then the archive
+ *  has no sections, and every step reads back as today's flattened step). */
+function encodeStepSection(steps: SnapEntry[]): Uint8Array | null {
+  if (!steps.some((s) => s.layers && s.layers.length > 0)) return null;
+  // Pool by identity: the capture and the reader both hand the SAME object to
+  // every step whose pixels are the same, so identity is the dedup.
+  const pool: Uint8Array[] = [];
+  const at = new Map<Uint8Array, number>();
+  const ref = (step: SnapEntry, p: Uint8Array) => {
+    if (p === step.png) return SAME_AS_COMPOSITE;
+    let i = at.get(p);
+    if (i === undefined) {
+      i = pool.length;
+      pool.push(p);
+      at.set(p, i);
+    }
+    return i;
+  };
+  const parts: Uint8Array[] = [];
+  const u32 = (v: number) => {
+    const b = new Uint8Array(4);
+    new DataView(b.buffer).setUint32(0, v, true);
+    parts.push(b);
+  };
+  const f64 = (v: number) => {
+    const b = new Uint8Array(8);
+    new DataView(b.buffer).setFloat64(0, v, true);
+    parts.push(b);
+  };
+  const bytes = (b: Uint8Array) => {
+    u32(b.length);
+    parts.push(b);
+  };
+  const str = (v: string) => bytes(enc.encode(v));
+
+  const body: Array<() => void> = [];
+  for (const step of steps) {
+    const layers = step.layers ?? [];
+    const refs = layers.map((l) => ref(step, l.png));
+    body.push(() => {
+      u32(layers.length);
+      layers.forEach((l, i) => {
+        u32(l.id);
+        str(l.name);
+        u32(l.visible ? 1 : 0);
+        f64(l.opacity);
+        u32(refs[i]);
+        str(JSON.stringify(l.annotations ?? []));
+        str(JSON.stringify(l.shapes ?? []));
+      });
+      u32(step.activeLayerId ?? layers[layers.length - 1]?.id ?? 0);
+    });
+  }
+  u32(pool.length);
+  for (const p of pool) bytes(p);
+  for (const write of body) write();
+
+  const out = new Uint8Array(parts.reduce((n, b) => n + b.length, 0));
+  let o = 0;
+  for (const b of parts) {
+    out.set(b, o);
+    o += b.length;
+  }
+  return out;
+}
+
+/** Read a STEP section into the steps, in place. Throws on a malformed
+ *  section; the caller then leaves every step flattened. */
+function decodeStepSection(data: Uint8Array, steps: SnapEntry[]): void {
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  let pos = 0;
+  const r32 = () => { const v = view.getUint32(pos, true); pos += 4; return v; };
+  const rf64 = () => { const v = view.getFloat64(pos, true); pos += 8; return v; };
+  const rb = (n: number) => {
+    if (pos + n > data.length) throw new Error("STEP section truncated");
+    const v = data.slice(pos, pos + n); pos += n; return v;
+  };
+  const rstr = () => dec.decode(rb(r32()));
+
+  const pool: Uint8Array[] = [];
+  const poolCount = r32();
+  for (let i = 0; i < poolCount; i++) pool.push(rb(r32()));
+  const out: Array<{ layers: PersistedLayer[]; active: number }> = [];
+  for (const step of steps) {
+    const n = r32();
+    const layers: PersistedLayer[] = [];
+    for (let i = 0; i < n; i++) {
+      const id = r32();
+      const name = rstr();
+      const visible = r32() !== 0;
+      const opacity = rf64();
+      const ref = r32();
+      const png = ref === SAME_AS_COMPOSITE ? step.png : pool[ref];
+      if (!png) throw new Error(`STEP section: no pooled PNG ${ref}`);
+      const annotations = parseSnapshotAnnotations(rstr());
+      const shapes = parseShapes(rstr());
+      layers.push({ id, name, visible, opacity, png, annotations, shapes });
+    }
+    out.push({ layers, active: r32() });
+  }
+  // Only now, with the whole section read, do the steps change.
+  steps.forEach((step, i) => {
+    if (out[i].layers.length === 0) return;
+    step.layers = out[i].layers;
+    step.activeLayerId = out[i].active;
+  });
 }
 
 /** The 8-byte PNG signature. The ONLY thing that makes a non-archive blob a
@@ -131,7 +266,34 @@ export function looksLikePng(data: Uint8Array): boolean {
   return data.byteLength >= 8 && PNG_MAGIC.every((b, i) => data[i] === b);
 }
 
+/** What `readArchive` found. `newer` means the archive was written by a
+ *  newer version of Image Horse that this one can't read: nothing was read,
+ *  and the bytes are untouched. `sectionsAt` is the byte offset of the v7
+ *  section table (for tooling and tests; absent before v7). */
+export type ArchiveRead =
+  | { kind: "ok"; edit: SavedEdit; sectionsAt?: number }
+  | { kind: "newer"; version: number };
+
+/** The error `decodeArchive` throws for a `newer` archive. */
+class ArchiveTooNewError extends Error {
+  constructor(readonly version: number) {
+    super(`This edit was made by a newer version of Image Horse (archive v${version}); this version reads up to v${VERSION}.`);
+    this.name = "ArchiveTooNewError";
+  }
+}
+
+/** Decode an archive, throwing on anything it can't read — a newer archive
+ *  throws `ArchiveTooNewError`. Prefer `readArchive` where "newer" needs its
+ *  own answer. */
 export function decodeArchive(data: Uint8Array): SavedEdit {
+  const r = readArchive(data);
+  if (r.kind === "newer") throw new ArchiveTooNewError(r.version);
+  return r.edit;
+}
+
+/** Decode an archive. Throws on corrupt bytes; a newer archive this build
+ *  can't read is `{ kind: "newer" }`, not a throw. */
+export function readArchive(data: Uint8Array): ArchiveRead {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   let pos = 0;
 
@@ -142,8 +304,13 @@ export function decodeArchive(data: Uint8Array): SavedEdit {
 
   if (r32() !== MAGIC) throw new Error("Invalid archive");
   const version = r32();
-  if (version < 1 || version > VERSION) {
+  if (version < 1) {
     throw new Error("Unknown archive version");
+  }
+  // v7+: the oldest reader that can read it. Newer than this build → refuse.
+  const compat = version >= 7 ? r32() : version;
+  if (version > VERSION && compat > VERSION) {
+    return { kind: "newer", version };
   }
 
   const canvasW = r32();
@@ -223,9 +390,33 @@ export function decodeArchive(data: Uint8Array): SavedEdit {
     for (const snapshot of redoStack) snapshot.exportQuality = r32();
   }
 
-  return {
+  const edit: SavedEdit = {
     exportQuality,
     canvasW, canvasH, canvasPng, undoStack, redoStack, annotations, shapes,
     layers, activeLayerId,
   };
+  if (version < 7) return { kind: "ok", edit };
+
+  // v7 section table. A section this reader doesn't know is skipped; a STEP
+  // section that won't read leaves the steps flattened (today's steps) rather
+  // than failing the whole archive, the same choice v5 made for layers.
+  edit.archiveVersion = 7;
+  const sectionsAt = pos;
+  try {
+    const count = r32();
+    for (let i = 0; i < count; i++) {
+      const tag = r32();
+      const len = r32();
+      if (pos + len > data.length) throw new Error("archive section truncated");
+      const body = data.subarray(pos, pos + len);
+      pos += len;
+      if (tag === TAG_STEP) decodeStepSection(body, [...undoStack, ...redoStack]);
+    }
+  } catch {
+    for (const s of [...undoStack, ...redoStack]) {
+      delete s.layers;
+      delete s.activeLayerId;
+    }
+  }
+  return { kind: "ok", edit, sectionsAt };
 }
