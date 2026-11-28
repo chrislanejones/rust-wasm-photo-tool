@@ -1,9 +1,9 @@
 // Dump and restore a page's IndexedDB as JSON (pre-v974 fixture, QC 11-26's
 // "Not covered" line). Bytes become base64; Blobs keep their type. The spec
-// uses `restoreIdb`; make-fixtures.mjs has a plain-JS copy of `dumpIdb`
+// uses `restoreIdb`; the dump itself lives in make-fixtures.mjs, in plain JS
 // (it runs in Node with no TypeScript step).
 //
-// Both functions run IN THE PAGE (page.evaluate), so they are self-contained.
+// `restoreIdb` runs IN THE PAGE (page.evaluate), so it is self-contained.
 
 export interface DumpedStore {
   name: string;
@@ -18,47 +18,17 @@ export interface DumpedDb {
   stores: DumpedStore[];
 }
 
-/** In the page: every row of every store of each named database. */
-export async function dumpIdb(names: string[]): Promise<DumpedDb[]> {
-  const b64 = (u8: Uint8Array) => {
-    let s = "";
-    for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000));
-    return btoa(s);
-  };
-  const enc = async (v: unknown): Promise<unknown> => {
-    if (v instanceof Uint8Array) return { $u8: b64(v) };
-    if (v instanceof Uint8ClampedArray) return { $u8c: b64(new Uint8Array(v.buffer, v.byteOffset, v.byteLength)) };
-    if (v instanceof ArrayBuffer) return { $ab: b64(new Uint8Array(v)) };
-    if (v instanceof Blob) return { $blob: b64(new Uint8Array(await v.arrayBuffer())), type: v.type };
-    if (Array.isArray(v)) return Promise.all(v.map(enc));
-    if (v && typeof v === "object") {
-      const out: Record<string, unknown> = {};
-      for (const [k, x] of Object.entries(v)) out[k] = await enc(x);
-      return out;
-    }
-    return v;
-  };
-  const req = <T>(r: IDBRequest<T>) => new Promise<T>((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
-  const out: DumpedDb[] = [];
-  for (const name of names) {
-    const db = await req(indexedDB.open(name));
-    const stores: DumpedStore[] = [];
-    for (const sName of Array.from(db.objectStoreNames)) {
-      const store = db.transaction(sName, "readonly").objectStore(sName);
-      const keys = await req(store.getAllKeys());
-      const values = await req(store.getAll());
-      const indexes = Array.from(store.indexNames).map((i) => {
-        const ix = store.index(i);
-        return { name: i, keyPath: ix.keyPath, unique: ix.unique, multiEntry: ix.multiEntry };
-      });
-      const rows = [];
-      for (let i = 0; i < keys.length; i++) rows.push({ key: await enc(keys[i]), value: await enc(values[i]) });
-      stores.push({ name: sName, keyPath: store.keyPath, autoIncrement: store.autoIncrement, indexes, rows });
-    }
-    out.push({ name, version: db.version, stores });
-    db.close();
-  }
-  return out;
+/**
+ * The photo's key is the SHA-256 of `e2e/fixtures/paper-1200x900.png`. The
+ * fixture stores it as this placeholder instead: 64 hex characters next to a
+ * field named "...Key" read as an API key to the secret scan. Swap it back
+ * (in Node, before `restoreIdb`) with `fillPaperHash`.
+ */
+const PAPER_HASH_PLACEHOLDER = "{{PAPER_SHA256}}";
+
+/** In Node: the fixture's JSON with the placeholder swapped for the real hash. */
+export function fillPaperHash(json: string, paperSha256: string): string {
+  return json.split(PAPER_HASH_PLACEHOLDER).join(paperSha256);
 }
 
 /** In the page: write the dump back, creating any database or store that

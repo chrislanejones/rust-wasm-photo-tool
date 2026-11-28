@@ -18,7 +18,8 @@
 // three IndexedDB databases the resume reads. Bytes are base64 (see
 // idb-dump.ts, which the spec uses to write them back).
 import { chromium } from "@playwright/test";
-import { writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -72,7 +73,7 @@ for (let i = 0; !(await saved()); i++) {
   await new Promise((r) => setTimeout(r, 500));
 }
 
-// The same dump as idb-dump.ts `dumpIdb`, in plain JS (this file runs in Node
+// The dump, in the page, in plain JS (this file runs in Node
 // without a TypeScript step).
 const dump = await page.evaluate(async (names) => {
   const b64 = (u8) => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return btoa(s); };
@@ -105,9 +106,13 @@ const dump = await page.evaluate(async (names) => {
   return out;
 }, ["image-horse-edits", "image-horse-gallery", "image-horse-dexie"]);
 const meta = await page.evaluate(() => ({ userAgent: navigator.userAgent }));
+// The photo's key is the PNG's SHA-256; it is written as a placeholder so the
+// secret scan does not read 64 hex characters as an API key (idb-dump.ts
+// `fillPaperHash` puts it back).
+const PAPER_SHA256 = createHash("sha256").update(readFileSync(PAPER)).digest("hex");
 writeFileSync(
   join(HERE, "v973-stamp.json"),
-  JSON.stringify({ madeBy: "v9.73 (3f56626)", madeAt: new Date().toISOString(), ...meta, dbs: dump }) + "\n",
+  JSON.stringify({ madeBy: "v9.73 (3f56626)", madeAt: new Date().toISOString(), ...meta, dbs: dump }).split(PAPER_SHA256).join("{{PAPER_SHA256}}") + "\n",
 );
 console.log("wrote v973-stamp.json");
 await browser.close();

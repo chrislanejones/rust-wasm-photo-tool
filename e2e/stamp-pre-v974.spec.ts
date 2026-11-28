@@ -1,9 +1,10 @@
 import { test, expect } from "./guard/test";
 import type { Page } from "@playwright/test";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { installAnnotationProbe } from "./annotation-benchmark-harness";
-import { restoreIdb, type DumpedDb } from "./fixtures/pre-v974/idb-dump";
+import { fillPaperHash, restoreIdb, type DumpedDb } from "./fixtures/pre-v974/idb-dump";
 import { PLACEHOLDER_CONVEX_URL } from "./guard/backend";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,7 +20,12 @@ import { PLACEHOLDER_CONVEX_URL } from "./guard/backend";
 // fixtures/pre-v974/make-fixtures.mjs from a v9.73 build (see that file).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const FIXTURE = JSON.parse(readFileSync(join(__dirname, "fixtures/pre-v974/v973-stamp.json"), "utf8")) as {
+const FIXTURE = JSON.parse(
+  fillPaperHash(
+    readFileSync(join(__dirname, "fixtures/pre-v974/v973-stamp.json"), "utf8"),
+    createHash("sha256").update(readFileSync(join(__dirname, "fixtures/paper-1200x900.png"))).digest("hex"),
+  ),
+) as {
   madeBy: string;
   dbs: DumpedDb[];
 };
