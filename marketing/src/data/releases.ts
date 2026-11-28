@@ -24,6 +24,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "v9.84",
+    date: "2026-11-28",
+    headline: "Red shapes, one Export row, and photos that remember.",
+    entries: [
+      { tag: "ui", text: "New shapes fill red instead of white, so you can see them on a white canvas." },
+      { tag: "ui", text: "Export puts every format in one row: JPEG, PNG, WebP, AVIF, then SVG, then ORA and PSD. What can't apply is left out." },
+      { tag: "feature", text: "Find duplicates remembers each photo's fingerprint after a reload, and an edited photo still matches its original." },
+      { tag: "fix", text: "A {date} in ZIP file names keeps the photo's own file date after a reload." },
+      { tag: "infra", text: "A project saved in v9.73, before stamps became text, is now tested to open the same in today's build." },
+    ],
+  },
+  {
     version: "v9.83",
     date: "2026-11-27",
     headline: "Black Friday.",

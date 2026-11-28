@@ -99,19 +99,24 @@ changelog itself, so that one is hand-written: add the new release at the top.
 
 Latest release below. Full dated history → **[docs/Change-summary.md](docs/Change-summary.md)**.
 
-### v9.83 — 2026-11-27
+### v9.84 — 2026-11-28
 
-**Black Friday.**
+**Red shapes, one Export row, and photos that remember.**
 
-The Thanksgiving garland is down, and a Black Friday one is up in its
-place: black, red and gold flags, a red shopping bag, a gold star and a
-SALE tag that swings on its string. It hangs under the top bar and over
-the start screen from today through Sunday. Click the **×** and it stays
-closed for the year. On the dark theme the string has a faint edge so the
-black flags don't disappear into the page.
+A new shape now fills red instead of white. A white shape on a white
+canvas was invisible, which is a strange way to say hello.
 
-Nothing else changed. A photo saved by the old version opens fine in the
-new one.
+Export lost a row. Raster, Vector and With Layers are gone; the formats
+sit in one row instead (JPEG, PNG, WebP, AVIF, then SVG, then ORA and
+PSD), and anything that can't apply to your image is left out.
+
+Photos remember more after a reload. Find duplicates keeps each photo's
+fingerprint, so it doesn't hash your whole gallery again, and a heavily
+edited photo still matches the original it came from. A `{date}` in a
+ZIP's file names keeps the file's own date too.
+
+And a project saved back in v9.73, before stamps became text, has a test
+now proving it still opens: same picture, and one undo takes the stamp off.
 
 Full release notes: [Change Summary](docs/Change-summary.md) ·
 [Trail Log](https://imagehorse.app/trail-log).

@@ -12506,3 +12506,19 @@ Verification: run after the trail data regen. TypeScript clean; lint 0 errors (5
 No engine change (980,450 B). No Dexie schema or op-log change.
 
 Verification: run after the trail data regen. TypeScript clean; lint 0 errors (56 warnings); guardrails pass; vitest 2,596/2,596 (clean worktree, no env file); marketing build passes. PR #525: 15 checks passed, 0 failed; e2e was not waited on (cosmetic, by Chris's call).
+
+## v9.84 Change Summary — 2026-11-28
+
+**Red shapes, one Export row, and photos that remember.**
+
+| Area | Change |
+| --- | --- |
+| Shapes (#526) | A new shape's default fill is red (`TEXT_COLORS[1]`, `#ef4444`), not white: a white shape on a white canvas was invisible. Still the palette's second swatch, solid, no stroke. ADR-107 amended. |
+| Export (#529) | Kind (Raster / Vector / With Layers) and Format fold into one grouped Format row: `JPEG PNG WebP AVIF · SVG · ORA PSD`, one radio group, one Tab stop. A group that can't apply is left out (SVG unless the upload was an SVG; ORA/PSD on All). A raster format is picked on every open; a recipe still picks its format. `ToolButtonGroup` gains `groupStart` and `columns="row"`. The dialog is about 40 px shorter. |
+| Gallery (#528) | Photos keep Find duplicates' fingerprints (`fingerprintOriginal`, `fingerprintCurrent` + `fingerprintThumb`) and their file date (`fileDate` = `File.lastModified`) on the gallery manifest row. A reload hashes nothing; an edited photo still groups with its original; `{date}` survives a reload. Optional, unindexed fields on a structured-clone store: no Dexie bump (still `.version(2)`). Older photos are not backfilled. ADR-112 §5–6 (the ADR file lands with #527). |
+| Tests (#530) | A real v9.73 save (stamp burned into pixels, pre ADR-109) opens in today's build: composite byte for byte, one undo takes the stamp off, redo puts it back, no console error. Fixture `e2e/fixtures/pre-v974/v973-stamp.json`; the photo key is stored as `{{PAPER_SHA256}}` and filled in from the PNG, so the secret scan doesn't read it as an API key. Day log 11-28. |
+| Trail Log | Squares catch up through 11-28. |
+
+No engine change (980,450 B). No Dexie schema or op-log change. #527 (saved undo steps keep their layers) is held: CodeRabbit found duplicate layer ids after undo, stale Canvas opacity in cached steps, and a cloud-archive overwrite case.
+
+Verification: run after the trail data regen. TypeScript clean; lint 0 errors (56 warnings); guardrails pass; vitest 2,609/2,609 (clean worktree, no env file); marketing build passes. Each PR merged with its full CI green (#526, #529, #530: 18–19 pass, 0 fail; #528 after one rerun of an unrelated annotation-multiselect flake). #530 needed two fixes before it went green: the fixture hash placeholder plus one `.gitleaksignore` entry for the commit that first held it, and removing the unused `dumpIdb` export.
