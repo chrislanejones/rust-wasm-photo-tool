@@ -31,6 +31,11 @@ export interface ToolButtonOption<T extends string> {
    *  a plain action is never announced as "not pressed". Ignored for the
    *  announcement in a SELECT group, where the tile is a radio instead. */
   active?: boolean;
+  /** This tile starts a new GROUP in one row of tiles (Export's Format row:
+   *  JPEG PNG WebP AVIF · SVG · ORA PSD). Drawn as a gap and a thin rule
+   *  before it, and marked `data-group-start`. Still ONE radio group: one Tab
+   *  stop, arrows run straight through the groups. */
+  groupStart?: boolean;
 }
 
 interface Props<T extends string> {
@@ -46,8 +51,10 @@ interface Props<T extends string> {
    *  select, with nothing checked. docs/06.1-UI-Consistency.md §7. */
   value?: T;
   onChange: (id: T) => void;
-  /** Column count for the grid. Defaults to 2. */
-  columns?: 2 | 3 | 4 | 5;
+  /** Column count for the grid. Defaults to 2. `"row"`: every tile in one
+   *  row, as many columns as tiles (a row whose length changes with what
+   *  applies, like Export's Format row). */
+  columns?: 2 | 3 | 4 | 5 | "row";
   /** One icon-only row in a recessed trough, the active segment raised — the
    *  Combine control (design: "Select Panel", 09-27-2026; the control moved to
    *  the REVIEW panel in ADR-075, the variant did not change).
@@ -138,8 +145,9 @@ export function ToolButtonGroup<T extends string>(props: Props<T>) {
           segmented
             ? "flex gap-1 rounded-lg bg-bg-tertiary p-1"
             : "grid gap-2 [grid-auto-rows:1fr]",
-          !segmented && COL_CLASS[columns],
+          !segmented && columns !== "row" && COL_CLASS[columns],
         )}
+        style={!segmented && columns === "row" ? { gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` } : undefined}
         {...(isSelect
           ? { ...radio.groupProps, ...name, "aria-describedby": props["aria-describedby"] }
           : {})}
@@ -158,6 +166,14 @@ export function ToolButtonGroup<T extends string>(props: Props<T>) {
               pro={opt.pro}
               title={opt.title}
               onClick={() => onChange(opt.id)}
+              {...(opt.groupStart && !segmented
+                ? {
+                    "data-group-start": "",
+                    // The rule sits in the gap before the tile: the tile keeps
+                    // its own box, so its border and lit state are untouched.
+                    className: "relative ml-2 before:pointer-events-none before:absolute before:-left-[9px] before:top-2 before:bottom-2 before:w-px before:bg-border",
+                  }
+                : {})}
               {...(segmented
                 ? {
                     // The visible text is gone, so the label becomes the name.

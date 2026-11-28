@@ -8,29 +8,32 @@
 //   2. File Name   name + its extension, one box,    Recipe: menu + Save recipe,
 //                  then Recipe (Raster): menu +       then Batch settings
 //                  Save recipe, the image's settings
-//   3. Kind        Raster | Vector | With Layers     Raster | Vector (no layers
-//                  — Raster on every open             in a ZIP)
-//   4. Format      tiles named for the format (JPEG PNG WebP AVIF + plugins ·
-//                  SVG · ORA, PSD), one line under them saying what it's for
-//   5. Privacy & Metadata   a drop-down, shut, its choice on the right (ADR-108)
-//   6. Footer      what you'll get ("photo.jpg · 1 image · JPEG" / "3 images ·
+//   3. Format      ONE row of tiles named for the format, grouped:
+//                  JPEG PNG WebP AVIF (+ plugins) · SVG · ORA PSD. A group
+//                  that can't apply is left out: SVG unless an image was
+//                  uploaded as SVG, ORA/PSD on All (no layers in a ZIP). A
+//                  raster format on every open. One line under the row says
+//                  what the picked one is for. (Until 11-28-2026 a "Kind of
+//                  file" row, Raster | Vector | With Layers, sat above it.)
+//   4. Privacy & Metadata   a drop-down, shut, its choice on the right (ADR-108)
+//   5. Footer      what you'll get ("photo.jpg · 1 image · JPEG" / "3 images ·
 //                  JPEG · ZIP") with how compressed it is pushed to the right
 //                  ("42% compressed" / "2 of 3 compressed"), the quiet actions
 //                  (Share link, Clipboard / Share All · Soon) and ONE solid
 //                  primary: Download JPEG / Download ZIP
 //
-// A recipe (row 2) applies to a Raster download of either scope (Chris,
+// A recipe (row 2) applies to a raster-format download of either scope (Chris,
 // 11-24-2026: "can single image have recipe too"). On Selected it shapes the
 // one file — size, format, quality, camera info — and the name stays the
 // field's; the extension, the summary and the button follow its format.
 //
-// Rows 1 and 3 are the top bar's ToggleButtonGroup in select mode — a radio
-// group each, one Tab stop, arrow keys. Row 4 is the Shapes picker's
-// ToolButtonGroup (stacked), one radio group per kind.
+// Row 1 is the top bar's ToggleButtonGroup in select mode — a radio group,
+// one Tab stop, arrow keys. Row 3 is the Shapes picker's ToolButtonGroup
+// (stacked, `columns="row"`): ONE radio group across all its groups.
 //
 // The parent (AppShell) still decides what a download writes from `format`:
 // "svg" on All images zips the SVGs, anything else zips in `zipFormat`.
-// Picking a kind here therefore just picks that kind's format.
+// Picking a tile here therefore just picks that format.
 //
 // SVG passthrough: the SVG tile writes the uploaded SVG back out, cropped the
 // way the image was cropped (lib/svgPassthrough.ts), a zip of them on All.
@@ -44,8 +47,6 @@ import {
   Download,
   FolderArchive,
   Image as ImageIcon,
-  Layers,
-  PenTool,
   Share2,
 } from "lucide-react";
 import {
@@ -235,13 +236,6 @@ function ExportBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- on open only
   }, []);
 
-  /** Pick a kind: it lands on that kind's format — the raster one the store
-   *  already holds, SVG, or ORA (or the first layered plugin format). */
-  const pickKind = (k: Kind) => {
-    if (k === "raster") onFormatChange(zipFormat);
-    else if (k === "vector") onFormatChange("svg");
-    else onFormatChange((kindOfFormat(format) === "layers" ? format : "ora") as DownloadFormat);
-  };
   const pickScope = (next: Scope) => {
     setPicked(next);
     // Leaving a kind the new scope cannot have: the parent writes from
@@ -259,15 +253,21 @@ function ExportBody({
 
   // ── Row 4's tiles, per kind ────────────────────────────────────────────
   // Each tile is named for its format; `hint` is the line under the row.
-  type Tile = { id: FormatTileId; label: string; icon: React.ComponentType; title: string; hint: string; disabled?: boolean };
+  type Tile = {
+    id: FormatTileId;
+    label: string;
+    icon: React.ComponentType;
+    title: string;
+    hint: string;
+    disabled?: boolean;
+    groupStart?: boolean;
+  };
   const pluginTile = ({ plugin, format: f }: ActiveFormat): Tile => ({
     id: f.id as FormatTileId,
     label: f.label,
     icon: FORMAT_TILE_ICONS[f.id] ?? pluginTileIcon(f.label),
     title: `${f.label} — ${f.hint} (${plugin.name} plugin).`,
-    // The plugin's hint names its kind ("Layered · Photoshop"); the Kind row
-    // says that, so the line keeps the rest.
-    hint: f.hint.replace(/^Layered\s*·\s*/i, "") || f.hint,
+    hint: f.hint,
   });
   const rasterTiles: Tile[] = [
     ...formats
@@ -324,7 +324,17 @@ function ExportBody({
           },
         ]),
   ];
-  const tiles = kind === "raster" ? rasterTiles : kind === "vector" ? vectorTiles : layerTiles;
+  // ONE Format row (11-28-2026, the A/B the 11-24 plan asked for): the
+  // groups side by side, JPEG PNG WebP AVIF · SVG · ORA PSD. A group that
+  // can't apply is LEFT OUT, the dialog's rule since 11-24: SVG unless an
+  // image was uploaded as SVG, the layered files on All (one file at a time).
+  const startGroup = (group: Tile[]): Tile[] =>
+    group.map((t, i) => (i === 0 ? { ...t, groupStart: true } : t));
+  const tiles: Tile[] = [
+    ...rasterTiles,
+    ...(vectorOn ? startGroup(vectorTiles) : []),
+    ...(layersOn ? startGroup(layerTiles) : []),
+  ];
   const tileValue: FormatTileId = kind === "raster" ? (kindOfFormat(format) === "raster" ? format : zipFormat) : format;
   const pickedTile = tiles.find((t) => t.id === tileValue);
   const psdOff = kind === "layers" && !pluginIds.has("psd");
@@ -414,44 +424,15 @@ function ExportBody({
           recipeFits && <ZipRecipePicker zipFormat={zipFormat} />
         )}
 
-        {/* 3. Kind. With Layers is one file at a time, so All leaves it out. */}
-        <ToggleButtonGroup
-          mode="select"
-          aria-label="Kind of file"
-          fill
-          items={[
-            { key: "raster", icon: ImageIcon, label: "Raster", active: kind === "raster", onToggle: () => pickKind("raster") },
-            {
-              key: "vector",
-              icon: PenTool,
-              label: "Vector",
-              active: kind === "vector",
-              onToggle: () => pickKind("vector"),
-              disabled: !vectorOn,
-              tooltip: { label: vectorOn ? "Vector: the SVG you uploaded" : "Vector: only for images uploaded as SVG" },
-            },
-            ...(scope === "selected"
-              ? [
-                  {
-                    key: "layers",
-                    icon: Layers,
-                    label: "With Layers",
-                    active: kind === "layers",
-                    onToggle: () => pickKind("layers"),
-                    tooltip: { label: "With Layers: every layer kept, to open in another editor" },
-                  },
-                ]
-              : []),
-          ]}
-        />
-
-        {/* 4. Format — the Shapes picker's tiles, named for the format, and
-            one line saying what the picked one is for. */}
+        {/* 3. Format — ONE row of the Shapes picker's tiles, named for the
+            format, grouped raster · vector · layered, and one line saying
+            what the picked one is for. There is no Kind row: the groups ARE
+            the kinds, and a group that can't apply is left out. */}
         <div className="space-y-2">
           <ToolButtonGroup<FormatTileId>
             aria-label="Format"
             stacked
-            columns={kind === "raster" ? 4 : 3}
+            columns="row"
             value={tileValue}
             onChange={(id) => {
               const t = tiles.find((o) => o.id === id);
@@ -470,13 +451,13 @@ function ExportBody({
           )}
         </div>
 
-        {/* 5. Privacy & Metadata (ADR-108), a drop-down. An SVG carries no
+        {/* 4. Privacy & Metadata (ADR-108), a drop-down. An SVG carries no
             camera info. */}
         {kind !== "vector" && (
           <CameraInfoPicker variant="dropdown" recipeChoice={recipe?.cameraInfo} />
         )}
 
-        {/* 6. Footer: what you'll get, the quiet actions, ONE primary — the
+        {/* 5. Footer: what you'll get, the quiet actions, ONE primary — the
             confirm dialogs' solid "yes, do it" fill. */}
         <div data-slot="export-footer" className={cn(PANEL_DIVIDER, "space-y-3")}>
           {/* What you'll get on the left, how compressed on the right. */}

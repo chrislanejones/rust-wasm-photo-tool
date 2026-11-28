@@ -5,10 +5,10 @@ import { join } from "node:path";
 // The Export dialog as ONE step that adapts to the task (Chris, 11-24-2026):
 //   1. Selected image | All images (N)             — top bar style group
 //   2. Selected: File Name (+ its extension), Recipe  ·  All: Recipe + Batch settings
-//   3. Raster | Vector | With Layers (Selected only) — top bar style group
-//   4. that kind's format tiles, named JPEG PNG…   — the Shapes picker's tiles
-//   5. Privacy & Metadata                          — a drop-down, shut
-//   6. footer: what you'll get (how compressed on the right), Share link · Clipboard, ONE primary Download
+//   3. ONE Format row, JPEG PNG WebP AVIF · SVG · ORA PSD — the Shapes
+//      picker's tiles; a group that can't apply is left out (11-28-2026)
+//   4. Privacy & Metadata                          — a drop-down, shut
+//   5. footer: what you'll get (how compressed on the right), Share link · Clipboard, ONE primary Download
 //      (All: Share All · Soon (off), Download ZIP)
 // A row that cannot apply is left out, not grayed. Alt+E opens it.
 
@@ -44,15 +44,17 @@ test("one step: the rows, and how each scope adapts", async ({ page }) => {
   await page.getByRole("button", { name: "Export", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
   const what = dialog.getByRole("radiogroup", { name: "What to export" });
-  const kind = dialog.getByRole("radiogroup", { name: "Kind of file" });
   const format = dialog.getByRole("radiogroup", { name: "Format" });
+  const raster = format.getByRole("radio", { name: /^(JPEG|PNG|WebP|AVIF)$/ });
   await expect(what.getByRole("radio", { name: "Selected image" })).toHaveAttribute("aria-checked", "true");
-  await expect(kind.getByRole("radio", { name: "Raster" })).toHaveAttribute("aria-checked", "true");
-  // The tiles are named for their format.
-  for (const name of ["JPEG", "PNG", "WebP", "AVIF"]) {
+  // ONE Format row, no Kind row (11-28-2026): JPEG PNG WebP AVIF · ORA PSD.
+  await expect(dialog.getByRole("radiogroup", { name: "Kind of file" })).toHaveCount(0);
+  for (const name of ["JPEG", "PNG", "WebP", "AVIF", "ORA", "PSD"]) {
     await expect(format.getByRole("radio", { name, exact: true }), name).toBeVisible();
   }
-  await expect(format.getByRole("radio")).toHaveCount(4);
+  await expect(format.getByRole("radio")).toHaveCount(6);
+  // A raster format on every open.
+  await expect(raster.and(page.locator('[aria-checked="true"]'))).toHaveCount(1);
   await expect(dialog.getByTestId("export-format-says")).toHaveText(/^(JPEG|PNG|WebP|AVIF) — /);
 
   // Selected: the name with its extension, a recipe under it, one primary.
@@ -65,8 +67,8 @@ test("one step: the rows, and how each scope adapts", async ({ page }) => {
   await expect(dialog.getByRole("button", { name: /^Download (JPEG|PNG|WebP|AVIF)$/ })).toBeEnabled();
   await expect(dialog.locator("#export-summary")).toContainText("1 image");
   await expect(dialog.getByTestId("export-compressed")).toHaveText(/compressed|larger/i);
-  // No SVG open: Vector is off.
-  await expect(kind.getByRole("radio", { name: "Vector" })).toBeDisabled();
+  // No SVG open: its group is left out of the row.
+  await expect(format.getByRole("radio", { name: "SVG", exact: true })).toHaveCount(0);
 
   // Privacy & Metadata: shut, its choice on the right; opens to Camera Info.
   const privacy = dialog.getByRole("button", { name: /^Privacy & Metadata/ });
@@ -75,26 +77,27 @@ test("one step: the rows, and how each scope adapts", async ({ page }) => {
   await privacy.click();
   await expect(dialog.getByRole("radiogroup", { name: "Camera Info" })).toBeVisible();
 
-  // With Layers: ORA, and the PSD placeholder.
-  await kind.getByRole("radio", { name: "With Layers" }).click();
+  // The layered group: ORA, and the PSD placeholder.
+  await format.getByRole("radio", { name: "ORA", exact: true }).click();
   await expect(format.getByRole("radio", { name: "ORA", exact: true })).toHaveAttribute("aria-checked", "true");
   await expect(format.getByRole("radio", { name: "PSD", exact: true })).toBeDisabled();
   await expect(dialog.getByTestId("export-format-says")).toContainText("PSD plugin");
   await expect(dialog.getByRole("button", { name: "Download ORA" })).toBeVisible();
 
-  // Raster is the default on every open: an ORA pick doesn't stick.
+  // A raster format on every open: an ORA pick doesn't stick.
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await page.getByRole("button", { name: "Export", exact: true }).first().click();
-  await expect(kind.getByRole("radio", { name: "Raster" })).toHaveAttribute("aria-checked", "true");
-  await kind.getByRole("radio", { name: "With Layers" }).click();
+  await expect(raster.and(page.locator('[aria-checked="true"]'))).toHaveCount(1);
+  await format.getByRole("radio", { name: "ORA", exact: true }).click();
 
-  // All: layered files can't go in a ZIP, so the kind falls back to Raster
-  // and With Layers is left out; the recipe and its Batch settings come in,
-  // the name field goes.
+  // All: layered files can't go in a ZIP, so the pick falls back to a raster
+  // format and the layered group is left out; the recipe and its Batch
+  // settings come in, the name field goes.
   await what.getByRole("radio", { name: /^All images/ }).click();
-  await expect(kind.getByRole("radio", { name: "Raster" })).toHaveAttribute("aria-checked", "true");
-  await expect(kind.getByRole("radio", { name: "With Layers" })).toHaveCount(0);
+  await expect(raster.and(page.locator('[aria-checked="true"]'))).toHaveCount(1);
+  await expect(format.getByRole("radio", { name: "ORA", exact: true })).toHaveCount(0);
+  await expect(format.getByRole("radio")).toHaveCount(4);
   await expect(dialog.getByLabel("Recipe")).toBeEnabled();
   await expect(dialog.getByRole("button", { name: "Save recipe" })).toBeEnabled();
   const batch = dialog.getByLabel("Batch settings");
@@ -111,11 +114,13 @@ test("one step: the rows, and how each scope adapts", async ({ page }) => {
 test("the rows are radio groups: one Tab stop each, arrow keys move", async ({ page }) => {
   await page.getByRole("button", { name: "Export", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
-  const kind = dialog.getByRole("radiogroup", { name: "Kind of file" });
-  const raster = kind.getByRole("radio", { name: "Raster" });
-  await raster.focus();
-  await page.keyboard.press("ArrowRight"); // Vector is off: skipped
-  await expect(kind.getByRole("radio", { name: "With Layers" })).toHaveAttribute("aria-checked", "true");
-  const tabbable = await kind.getByRole("radio").evaluateAll((els) => els.filter((e) => e.getAttribute("tabindex") === "0").length);
+  // The Format row is ONE radio group across its groups: arrows run from the
+  // raster group straight into the layered one.
+  const format = dialog.getByRole("radiogroup", { name: "Format" });
+  await format.getByRole("radio", { name: "AVIF", exact: true }).click();
+  await format.getByRole("radio", { name: "AVIF", exact: true }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(format.getByRole("radio", { name: "ORA", exact: true })).toHaveAttribute("aria-checked", "true");
+  const tabbable = await format.getByRole("radio").evaluateAll((els) => els.filter((e) => e.getAttribute("tabindex") === "0").length);
   expect(tabbable).toBe(1);
 });

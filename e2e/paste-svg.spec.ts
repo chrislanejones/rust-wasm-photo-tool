@@ -131,16 +131,11 @@ test("Paste SVG: Back at the top, Create Canvas makes an image at the chosen siz
   // Exactly the size typed, not scaled up to 1024 like a dropped file.
   await expect.poll(() => storedSizes(page), { timeout: 15_000 }).toEqual(["512x512"]);
 
-  // It went in as an SVG, so it can go back out as one: the Export dialog
-  // opens on Raster, and the SVG tile is under Vector (#515).
+  // It went in as an SVG, so it can go back out as one: the Export dialog's
+  // Format row carries the SVG group (#515; one row since 11-28-2026).
   await page.getByRole("button", { name: "Export", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
-  const vector = dialog.getByRole("radiogroup", { name: "Kind of file" }).getByRole("radio", { name: "Vector" });
-  await expect(vector).toBeEnabled({ timeout: 10_000 });
-  await vector.click();
-  const svgTile = dialog
-    .getByRole("radio")
-    .filter({ has: page.getByText("SVG", { exact: true }) });
+  const svgTile = dialog.getByRole("radiogroup", { name: "Format" }).getByRole("radio", { name: "SVG", exact: true });
   await expect(svgTile).toBeEnabled({ timeout: 10_000 });
 });
 
