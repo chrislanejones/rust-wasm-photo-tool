@@ -59,13 +59,12 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/");
 });
 
-test("the SVG tile is disabled for a raster image", async ({ page }) => {
+test("the SVG tile is left out for a raster image", async ({ page }) => {
   await upload(page, [pngFile()]);
   const dialog = await openExportDialog(page);
-  // Vector is the SVG kind: off unless an SVG is open.
-  await expect(dialog.getByRole("radio", { name: "Vector" })).toBeDisabled();
+  // The SVG group is left out of the Format row unless an SVG is open.
+  await expect(dialog.getByRole("radio", { name: "SVG", exact: true })).toHaveCount(0);
   // PSD ships as a separate plugin, so its tile points there, not at a date.
-  await dialog.getByRole("radio", { name: "With Layers" }).click();
   const psd = dialog.getByRole("radio", { name: "PSD", exact: true });
   await expect(psd).toBeDisabled();
 });
@@ -76,7 +75,6 @@ test("an untouched SVG downloads byte-for-byte, a cropped one with its viewBox c
   await upload(page, [svgFile("shapes.svg")]);
 
   let dialog = await openExportDialog(page);
-  await dialog.getByRole("radio", { name: "Vector" }).click();
   await svgTile(dialog).click();
   await expect(dialog.getByRole("button", { name: "Download SVG" })).toBeVisible();
   let dl = await downloadText(page, () =>
@@ -94,7 +92,6 @@ test("an untouched SVG downloads byte-for-byte, a cropped one with its viewBox c
   await page.waitForTimeout(800);
 
   dialog = await openExportDialog(page);
-  await dialog.getByRole("radio", { name: "Vector" }).click();
   await svgTile(dialog).click();
   dl = await downloadText(page, () => dialog.getByRole("button", { name: "Download SVG" }).click());
   const text = dl.bytes.toString("utf8");
@@ -112,7 +109,6 @@ test("All Images zips just the SVGs", async ({ page }) => {
   await upload(page, [svgFile("one.svg"), pngFile(), svgFile("two.svg")]);
   const dialog = await openExportDialog(page);
   await dialog.getByRole("radio", { name: /^All images/ }).click();
-  await dialog.getByRole("radio", { name: "Vector" }).click();
   await svgTile(dialog).click();
   await expect(dialog.locator("#export-summary")).toHaveText("2 images · SVG · ZIP");
   const button = dialog.getByRole("button", { name: "Download ZIP", exact: true });

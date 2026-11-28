@@ -69,8 +69,7 @@ test("a plugin added from Settings adds its format to Download and Import / Expo
 }) => {
   // 1. Nothing added: PSD is a disabled placeholder, and there is no IHL.
   let dialog = await openExportDialog(page);
-  // PSD and the layered test plugin are "With Layers" formats.
-  await dialog.getByRole("radio", { name: "With Layers" }).click();
+  // PSD and the layered test plugin are in the Format row's layered group.
   const placeholder = dialog.getByTitle(/^PSD — layered Photoshop file/);
   await expect(placeholder).toBeVisible();
   await expect(placeholder).toBeDisabled();
@@ -98,7 +97,6 @@ test("a plugin added from Settings adds its format to Download and Import / Expo
   // 3. The tile is live (and, for PSD, the placeholder has given way);
   // download through it and check the file.
   dialog = await openExportDialog(page);
-  await dialog.getByRole("radio", { name: "With Layers" }).click();
   await expect(dialog.getByTitle(/^PSD — layered Photoshop file/)).toHaveCount(
     FORMAT.ext === ".psd" ? 0 : 1,
   );
