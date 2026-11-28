@@ -18,3 +18,11 @@
 # branch builds the value at runtime instead, so the current tree scans clean;
 # this entry only covers the one pushed commit, which we never rewrite.
 3985a8aa717500e5325b4969d2da486f8f97b32d:e2e/phone-no-engine.spec.ts:generic-api-key:143
+
+# #530 (42f339f1), e2e/fixtures/pre-v974/v973-stamp.json:1: the photo's key in
+# an IndexedDB dump fixture, which is the SHA-256 of
+# e2e/fixtures/paper-1200x900.png, not a credential. generic-api-key matches it
+# because the fields are named originalKey / uploadKey / key. The next commits
+# store {{PAPER_SHA256}} and the spec fills it in from the PNG, so the current
+# tree scans clean; this entry only covers the one pushed commit.
+42f339f133f916ccdbfb277280db42ed3f0c96d2:e2e/fixtures/pre-v974/v973-stamp.json:generic-api-key:1
