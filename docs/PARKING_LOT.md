@@ -144,11 +144,11 @@ The day log listed these as "for PARKING_LOT, each needs your call" and never fi
 
 | From | Item |
 |---|---|
-| Find duplicates (#473) | Duplicate fingerprints aren't saved; saving them needs a Dexie migration |
+| Find duplicates (#473) | ~~Duplicate fingerprints aren't saved; saving them needs a Dexie migration~~ **FIXED 11-28-2026** (`feat/243-photo-fields`, ADR-112): saved as optional fields on the gallery manifest row, which isn't Dexie, so no migration. Trusted while computed from the current thumbnail Blob |
 | Find duplicates (#473) | ~~Groups chain (A~B, B~C puts A, B, C together); rotated or mirrored copies aren't found~~ **FIXED 11-23-2026** (`feat/dupes-png-estimate`): groups form around their first photo, and the hash is matched in all 8 turns and flips (5 bits through a turn, 6 straight). See the day log 11-23 |
-| Find duplicates (#473) | The hash reads the current thumbnail, so a heavily edited photo no longer matches its original |
+| Find duplicates (#473) | ~~The hash reads the current thumbnail, so a heavily edited photo no longer matches its original~~ **FIXED 11-28-2026** (`feat/243-photo-fields`, ADR-112): the fingerprint of the first thumbnail is kept from import, and a match is the closer of original and current. Photos imported earlier can't get a pre-edit original back |
 | Auto tone (#476) | ~~Auto tone on a multi-layer document reads only the active layer~~ **CLOSED 11-23-2026, as designed**: Auto only sets the Adjustments sliders, and Adjustments edit the active layer alone (`tonal_preview_begin` copies `self.active`; `adjust_commit` writes that layer back). Reading the layer it will change is right; reading the whole document would tune one layer to the others' pixels |
-| Rename tokens (#474) | The `{date}` file date isn't kept after a reload (needs a stored field) |
+| Rename tokens (#474) | ~~The `{date}` file date isn't kept after a reload (needs a stored field)~~ **FIXED 11-28-2026** (`feat/243-photo-fields`, ADR-112): `PhotoEntry.fileDate`, from import |
 | Rename tokens (#474) | ~~AI Rename info text still says "colour" / "recognise"~~ **FIXED 11-19-2026** (`fix/v964-leftover-words`): "color" / "recognize" |
 | Compact Compare (#475) | ~~The compare lightbulb says "the top bar's Compare button", which the compact layout doesn't have~~ **FIXED 11-19-2026**: on compact it names the Gallery tab's Stop comparing button |
 | Compact Compare (#475) | ~~Compact layout while comparing: two "Stop comparing" controls (the tile and the status X)~~ **FIXED 11-19-2026**: the X shows on the wide layout only; compact keeps the tile |

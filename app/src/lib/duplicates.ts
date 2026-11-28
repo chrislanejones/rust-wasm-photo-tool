@@ -103,6 +103,21 @@ function looksSame(a: Fingerprint, b: Fingerprint): boolean {
   return hashDistance(a, b) <= LOOKS_SAME_BITS || turnedDistance(a, b) <= LOOKS_SAME_TURNED_BITS;
 }
 
+/** A photo's fingerprints: its current one, and (ADR-112) the one it had at
+ *  import, when that is stored and different. */
+export type Prints = Fingerprint | readonly Fingerprint[];
+
+const asList = (p: Prints): readonly Fingerprint[] => (Array.isArray(p) ? p : [p as Fingerprint]);
+
+/** Two photos look the same when ANY pairing of their fingerprints does,
+ *  each pairing held to the same limits (ADR-112: "the closer of original and
+ *  current"). An edited photo matches an untouched copy through its original;
+ *  a photo edited the same way as another matches through their currents. */
+function looksSameAny(a: Prints, b: Prints): boolean {
+  for (const x of asList(a)) for (const y of asList(b)) if (looksSame(x, y)) return true;
+  return false;
+}
+
 /**
  * Groups of look-alikes, each formed AROUND A CENTER (11-23-2026). In gallery
  * order, the first photo not yet in a group is a center, and every later
@@ -118,7 +133,7 @@ function looksSame(a: Fingerprint, b: Fingerprint): boolean {
  * Groups of one are dropped. `ids` order is kept inside a group, and groups
  * come in the order of their center, so the dialog reads in gallery order.
  */
-export function groupLookAlikes(items: readonly { id: string; fp: Fingerprint }[]): string[][] {
+export function groupLookAlikes(items: readonly { id: string; fp: Prints }[]): string[][] {
   const taken = new Array<boolean>(items.length).fill(false);
   const groups: string[][] = [];
   for (let i = 0; i < items.length; i++) {
@@ -127,7 +142,7 @@ export function groupLookAlikes(items: readonly { id: string; fp: Fingerprint }[
     const center = items[i]!;
     const group = [center.id];
     for (let j = i + 1; j < items.length; j++) {
-      if (taken[j] || !looksSame(center.fp, items[j]!.fp)) continue;
+      if (taken[j] || !looksSameAny(center.fp, items[j]!.fp)) continue;
       taken[j] = true;
       group.push(items[j]!.id);
     }
@@ -182,7 +197,7 @@ export function planGroup(photos: readonly DuplicateCandidate[]): GroupPlan {
  *  that would not decode) are left out rather than guessed at. */
 export function planDuplicates(
   photos: readonly DuplicateCandidate[],
-  fingerprints: ReadonlyMap<string, Fingerprint>,
+  fingerprints: ReadonlyMap<string, Prints>,
 ): GroupPlan[] {
   const items = photos.flatMap((p) => {
     const fp = fingerprints.get(p.id);

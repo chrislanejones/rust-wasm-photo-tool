@@ -186,3 +186,35 @@ describe("planDuplicates", () => {
     expect(ms).toBeLessThan(1000);
   });
 });
+
+// ADR-112 §5: a photo can bring two fingerprints, its original (from import)
+// and its current one. Two photos match when ANY pairing is within the limits.
+describe("original and current fingerprints (ADR-112)", () => {
+  const lake = { hi: 0x0f0f0f0f, lo: 0x33333333, rgb: 0x3060a0 };
+  // The same lake after Noir: different hash bits and a gray average color.
+  const noir = { hi: 0xf0f0f0f0, lo: 0xcccccccc, rgb: 0x808080 };
+  const photo = (id: string) => ({ id, width: 960, height: 720, byteSize: 1000, edited: id === "edited" });
+
+  it("an edited photo still groups with an unedited copy through its original", () => {
+    const fps = new Map<string, Fingerprint | readonly Fingerprint[]>([
+      ["edited", [noir, lake]],
+      ["copy", lake],
+    ]);
+    const plans = planDuplicates([photo("edited"), photo("copy")], fps);
+    expect(plans.map((p) => p.ids)).toEqual([["edited", "copy"]]);
+  });
+
+  it("without the original, the edit is too far to match", () => {
+    const plans = planDuplicates([photo("edited"), photo("copy")], new Map([["edited", noir], ["copy", lake]]));
+    expect(plans).toEqual([]);
+  });
+
+  it("the limits still hold on every pairing", () => {
+    const far = { hi: 0x00ff00ff, lo: 0x0f0f0f0f, rgb: 0x3060a0 };
+    const plans = planDuplicates([photo("a"), photo("b")], new Map<string, Fingerprint | readonly Fingerprint[]>([
+      ["a", [noir, lake]],
+      ["b", [far, far]],
+    ]));
+    expect(plans).toEqual([]);
+  });
+});

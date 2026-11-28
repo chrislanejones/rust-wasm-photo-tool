@@ -70,3 +70,30 @@ describe("loadNameFacts", () => {
     expect((await loadNameFacts({ uploadKey: "up", originalKey: "up" })).original).toBe("IMG_4021");
   });
 });
+
+// ADR-112 §5: the file's date is stored on the photo at import, so `{date}`
+// still has it after a reload, when the in-memory note is gone.
+describe("the stored file date (ADR-112)", () => {
+  it("is read from the photo when this session never saw the upload", async () => {
+    const at = Date.UTC(2019, 5, 15, 12);
+    const f = await loadNameFacts({ originalKey: "nothing-here", fileDate: at });
+    expect(f.fileDate).toBe(at);
+  });
+
+  it("a photo without it (saved before) falls through as today", async () => {
+    const f = await loadNameFacts({ originalKey: "nothing-here" });
+    expect(f.fileDate).toBeUndefined();
+  });
+});
+
+// ADR-112: the gallery's IndexedDB stays at Dexie `.version(2)` (IDB 20). A
+// guard, not red-first: nothing here can bump it, and a bump would be wrong.
+describe("no Dexie bump (ADR-112)", () => {
+  it("the schema is still v2 (IndexedDB 20)", async () => {
+    const { db } = await import("@/lib/dexie/db");
+    await db.open();
+    expect(db.verno).toBe(2);
+    expect(db.backendDB().version).toBe(20);
+    db.close();
+  });
+});
